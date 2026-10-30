@@ -7,21 +7,32 @@ interface Cupom {
   usos_maximos: number | null; usos_atuais: number; expira_em: string | null; ativo: boolean
 }
 interface Stats { usuarios: number; vendas: number; receita: number }
+interface Config { preco: number; imagem_url: string; link_download: string; produto_nome: string }
 
 export default function AdminDashboard() {
   const router = useRouter()
-  const [aba, setAba] = useState<'dashboard'|'cupons'|'usuarios'|'vendas'>('dashboard')
+  const [aba, setAba] = useState<'dashboard'|'cupons'|'usuarios'|'vendas'|'configuracoes'>('dashboard')
   const [stats, setStats] = useState<Stats>({ usuarios: 0, vendas: 0, receita: 0 })
   const [cupons, setCupons] = useState<Cupom[]>([])
   const [usuarios, setUsuarios] = useState<{id:string;nome:string;sobrenome:string;email:string;telefone:string;criado_em:string}[]>([])
   const [pedidos, setPedidos] = useState<{id:string;valor_final:number;status:string;criado_em:string;usuario_id:string}[]>([])
   const [novoCupom, setNovoCupom] = useState({ codigo: '', tipo: 'porcentagem', valor: '', usos_maximos: '', expira_em: '' })
   const [cupomMsg, setCupomMsg] = useState('')
+  const [config, setConfig] = useState<Config>({ preco: 31.99, imagem_url: '', link_download: '', produto_nome: 'SumblerControl' })
+  const [configMsg, setConfigMsg] = useState('')
+  const [configLoading, setConfigLoading] = useState(false)
 
   useEffect(() => { carregarDados() }, [aba])
 
   async function carregarDados() {
     try {
+      if (aba === 'configuracoes') {
+        const res = await fetch('/api/admin/config', { credentials: 'include' })
+        if (res.status === 401) { router.push('/admin'); return }
+        const data = await res.json()
+        setConfig(data)
+        return
+      }
       const res = await fetch('/api/admin/dados?tipo=' + aba, { credentials: 'include' })
       if (res.status === 401) { router.push('/admin'); return }
       const data = await res.json()
@@ -53,6 +64,17 @@ export default function AdminDashboard() {
     alert('E-mail reenviado!')
   }
 
+  async function salvarConfig(e: React.FormEvent) {
+    e.preventDefault(); setConfigMsg(''); setConfigLoading(true)
+    const res = await fetch('/api/admin/config', {
+      method: 'PATCH', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(config)
+    })
+    if (res.ok) setConfigMsg('✓ Configurações salvas com sucesso!')
+    else setConfigMsg('✗ Erro ao salvar')
+    setConfigLoading(false)
+  }
+
   async function logout() {
     await fetch('/api/auth/logout', { method: 'POST' })
     router.push('/admin')
@@ -63,19 +85,20 @@ export default function AdminDashboard() {
     { id: 'cupons', label: '🏷️ Cupons' },
     { id: 'usuarios', label: '👥 Usuários' },
     { id: 'vendas', label: '💰 Vendas' },
+    { id: 'configuracoes', label: '⚙️ Configurações' },
   ]
 
   return (
     <div style={{ minHeight: '100vh', background: '#090F1A', color: '#F1F5FA' }}>
-      {/* Sidebar */}
       <div style={{ display: 'flex' }}>
+        {/* Sidebar */}
         <div style={{ width: '220px', minHeight: '100vh', background: '#0D1420', borderRight: '1px solid #1E2939', padding: '24px 16px', display: 'flex', flexDirection: 'column' }}>
           <div style={{ marginBottom: '32px' }}>
             <div style={{ fontSize: '16px', fontWeight: '800', color: '#FBBF24', marginBottom: '4px' }}>⚙️ Admin</div>
             <div style={{ fontSize: '12px', color: '#647489' }}>SumblerControl</div>
           </div>
           {abas.map(a => (
-            <button key={a.id} onClick={() => setAba(a.id as 'dashboard'|'cupons'|'usuarios'|'vendas')} style={{ textAlign: 'left', padding: '10px 12px', borderRadius: '8px', border: 'none', background: aba === a.id ? 'rgba(59,130,246,0.15)' : 'transparent', color: aba === a.id ? '#3B82F6' : '#647489', fontSize: '14px', fontWeight: aba === a.id ? '600' : '400', cursor: 'pointer', marginBottom: '4px' }}>
+            <button key={a.id} onClick={() => setAba(a.id as typeof aba)} style={{ textAlign: 'left', padding: '10px 12px', borderRadius: '8px', border: 'none', background: aba === a.id ? 'rgba(59,130,246,0.15)' : 'transparent', color: aba === a.id ? '#3B82F6' : '#647489', fontSize: '14px', fontWeight: aba === a.id ? '600' : '400', cursor: 'pointer', marginBottom: '4px' }}>
               {a.label}
             </button>
           ))}
@@ -110,7 +133,6 @@ export default function AdminDashboard() {
           {aba === 'cupons' && (
             <div>
               <h2 style={{ fontSize: '20px', fontWeight: '800', marginBottom: '24px' }}>Gerenciar Cupons</h2>
-              {/* Form novo cupom */}
               <div style={{ background: '#111826', border: '1px solid #1E2939', borderRadius: '12px', padding: '24px', marginBottom: '24px' }}>
                 <h3 style={{ fontSize: '16px', fontWeight: '700', marginBottom: '16px' }}>Novo Cupom</h3>
                 <form onSubmit={criarCupom} style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '12px' }}>
@@ -130,7 +152,7 @@ export default function AdminDashboard() {
                     <input type="number" value={novoCupom.valor} onChange={e => setNovoCupom(p => ({ ...p, valor: e.target.value }))} placeholder={novoCupom.tipo === 'porcentagem' ? '30' : '10.00'} required style={inputStyle} />
                   </div>
                   <div>
-                    <label style={labelStyle}>Usos máximos (deixe vazio = ilimitado)</label>
+                    <label style={labelStyle}>Usos máximos (vazio = ilimitado)</label>
                     <input type="number" value={novoCupom.usos_maximos} onChange={e => setNovoCupom(p => ({ ...p, usos_maximos: e.target.value }))} placeholder="100" style={inputStyle} />
                   </div>
                   <div>
@@ -145,7 +167,6 @@ export default function AdminDashboard() {
                 </form>
                 {cupomMsg && <p style={{ marginTop: '12px', fontSize: '13px', color: cupomMsg.startsWith('✓') ? '#22C55E' : '#EF4444' }}>{cupomMsg}</p>}
               </div>
-              {/* Lista de cupons */}
               <div style={{ background: '#111826', border: '1px solid #1E2939', borderRadius: '12px', overflow: 'hidden' }}>
                 <table style={{ width: '100%', borderCollapse: 'collapse' }}>
                   <thead><tr style={{ background: '#151D2C' }}>
@@ -239,6 +260,56 @@ export default function AdminDashboard() {
               </div>
             </div>
           )}
+
+          {/* Configurações */}
+          {aba === 'configuracoes' && (
+            <div>
+              <h2 style={{ fontSize: '20px', fontWeight: '800', marginBottom: '8px' }}>Configurações do Site</h2>
+              <p style={{ color: '#647489', fontSize: '14px', marginBottom: '28px' }}>Alterações aplicadas em tempo real para todos os visitantes.</p>
+              <form onSubmit={salvarConfig} style={{ background: '#111826', border: '1px solid #1E2939', borderRadius: '12px', padding: '28px', display: 'flex', flexDirection: 'column', gap: '20px', maxWidth: '560px' }}>
+
+                <div>
+                  <label style={labelStyle}>Nome do produto</label>
+                  <input value={config.produto_nome} onChange={e => setConfig(p => ({ ...p, produto_nome: e.target.value }))} placeholder="SumblerControl" style={inputStyle} />
+                </div>
+
+                <div>
+                  <label style={labelStyle}>Preço mensal (R$)</label>
+                  <input
+                    type="number"
+                    step="0.01"
+                    min="0.01"
+                    value={config.preco}
+                    onChange={e => setConfig(p => ({ ...p, preco: parseFloat(e.target.value) }))}
+                    style={inputStyle}
+                  />
+                  <p style={{ fontSize: '12px', color: '#647489', marginTop: '4px' }}>Valor atual: R$ {config.preco.toFixed(2)}</p>
+                </div>
+
+                <div>
+                  <label style={labelStyle}>Link de download do instalador</label>
+                  <input value={config.link_download} onChange={e => setConfig(p => ({ ...p, link_download: e.target.value }))} placeholder="https://..." style={inputStyle} />
+                  <p style={{ fontSize: '12px', color: '#647489', marginTop: '4px' }}>Link enviado por e-mail após pagamento.</p>
+                </div>
+
+                <div>
+                  <label style={labelStyle}>URL da imagem do produto</label>
+                  <input value={config.imagem_url} onChange={e => setConfig(p => ({ ...p, imagem_url: e.target.value }))} placeholder="https://... ou /assets/SumblerControl.png" style={inputStyle} />
+                </div>
+
+                {configMsg && (
+                  <div style={{ background: configMsg.startsWith('✓') ? 'rgba(34,197,94,0.1)' : 'rgba(239,68,68,0.1)', border: `1px solid ${configMsg.startsWith('✓') ? 'rgba(34,197,94,0.3)' : 'rgba(239,68,68,0.3)'}`, borderRadius: '8px', padding: '12px', fontSize: '13px', color: configMsg.startsWith('✓') ? '#22C55E' : '#EF4444' }}>
+                    {configMsg}
+                  </div>
+                )}
+
+                <button type="submit" disabled={configLoading} style={{ padding: '12px', background: '#3B82F6', color: '#fff', border: 'none', borderRadius: '8px', fontSize: '14px', fontWeight: '700', cursor: 'pointer' }}>
+                  {configLoading ? 'Salvando...' : '💾 Salvar Configurações'}
+                </button>
+              </form>
+            </div>
+          )}
+
         </div>
       </div>
     </div>
