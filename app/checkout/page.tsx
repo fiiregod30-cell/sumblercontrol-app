@@ -114,7 +114,7 @@ export default function CheckoutPage() {
           <div style={{ background: '#151D2C', borderRadius: '10px', padding: '16px' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '8px' }}>
               <span style={{ color: '#647489', fontSize: '14px' }}>SumblerControl Mensal</span>
-              <span style={{ fontSize: '14px' }}>R$ 31,99</span>
+              <span style={{ fontSize: '14px' }}>{precoBase > 0 ? `R$ ${precoBase.toFixed(2).replace('.', ',')}` : '...'}</span>
             </div>
             {cupomData?.valido && (
               <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '8px' }}>
@@ -124,7 +124,7 @@ export default function CheckoutPage() {
             )}
             <div style={{ display: 'flex', justifyContent: 'space-between', borderTop: '1px solid #1E2939', paddingTop: '8px', marginTop: '8px' }}>
               <span style={{ fontWeight: '700' }}>Total</span>
-              <span style={{ fontWeight: '700', color: '#3B82F6', fontSize: '18px' }}>R$ {(cupomData?.precoFinal || 31.99).toFixed(2)}</span>
+              <span style={{ fontWeight: '700', color: '#3B82F6', fontSize: '18px' }}>R$ {(cupomData?.precoFinal || precoBase || 0).toFixed(2)}</span>
             </div>
           </div>
 
