@@ -1,13 +1,23 @@
-import { Resend } from 'resend'
+import nodemailer from 'nodemailer'
 
-const resend = new Resend(process.env.RESEND_API_KEY)
-const FROM = 'SumblerControl <onboarding@resend.dev>'
 const DOWNLOAD_LINK = process.env.DOWNLOAD_LINK!
+const SITE_URL = process.env.NEXT_PUBLIC_SITE_URL!
+
+// Transporter Gmail via App Password
+const transporter = nodemailer.createTransport({
+  service: 'gmail',
+  auth: {
+    user: process.env.GMAIL_USER,
+    pass: process.env.GMAIL_APP_PASSWORD,
+  },
+})
+
+const FROM = `SumblerControl <${process.env.GMAIL_USER}>`
 
 // ── E-mail de confirmação de cadastro ───────────────────────
 export async function sendConfirmationEmail(email: string, name: string, token: string) {
-  const confirmUrl = `${process.env.NEXT_PUBLIC_SITE_URL}/confirmar-email?token=${token}`
-  await resend.emails.send({
+  const confirmUrl = `${SITE_URL}/confirmar-email?token=${token}`
+  await transporter.sendMail({
     from: FROM,
     to: email,
     subject: 'Confirme seu e-mail — SumblerControl',
@@ -31,7 +41,7 @@ export async function sendConfirmationEmail(email: string, name: string, token: 
 
 // ── E-mail de entrega após pagamento confirmado ──────────────
 export async function sendDownloadEmail(email: string, name: string, pedidoId: string) {
-  await resend.emails.send({
+  await transporter.sendMail({
     from: FROM,
     to: email,
     subject: '✅ Pagamento confirmado — Seu download está pronto!',
@@ -49,7 +59,7 @@ export async function sendDownloadEmail(email: string, name: string, pedidoId: s
         <div style="margin:32px 0;text-align:center;">
           <a href="${DOWNLOAD_LINK}" style="background:#3B82F6;color:#fff;padding:16px 32px;border-radius:8px;text-decoration:none;font-weight:700;font-size:16px;">⬇️ Baixar SumblerControl</a>
         </div>
-        <p style="color:#647489;font-size:13px;line-height:1.6;">O link também está disponível na sua <a href="${process.env.NEXT_PUBLIC_SITE_URL}/minha-conta" style="color:#3B82F6;">área de conta</a>.</p>
+        <p style="color:#647489;font-size:13px;line-height:1.6;">O link também está disponível na sua <a href="${SITE_URL}/minha-conta" style="color:#3B82F6;">área de conta</a>.</p>
         <hr style="border:none;border-top:1px solid #1E2939;margin:24px 0;">
         <p style="color:#647489;font-size:12px;">SumblerControl — Mais FPS. Menos Gargalo. Performance Real.</p>
       </div>
@@ -59,7 +69,7 @@ export async function sendDownloadEmail(email: string, name: string, pedidoId: s
 
 // ── E-mail de reenvio manual (admin) ─────────────────────────
 export async function sendDownloadEmailManual(email: string, name: string) {
-  await resend.emails.send({
+  await transporter.sendMail({
     from: FROM,
     to: email,
     subject: '📦 SumblerControl — Link de download',

@@ -2,36 +2,12 @@ import { NextRequest, NextResponse } from 'next/server'
 import { supabaseAdmin } from '@/lib/supabase'
 import { sendDownloadEmail } from '@/lib/email'
 import { getPaymentStatus } from '@/lib/mercadopago'
-import crypto from 'crypto'
 
 export async function POST(req: NextRequest) {
   try {
-    // Verificação de assinatura do Mercado Pago
-    const secret = process.env.MP_WEBHOOK_SECRET
-    if (secret) {
-      const xSignature = req.headers.get('x-signature') || ''
-      const xRequestId = req.headers.get('x-request-id') || ''
-      const dataId = req.nextUrl.searchParams.get('data.id') || ''
-
-      const parts = xSignature.split(',')
-      let ts = '', v1 = ''
-      for (const part of parts) {
-        const [k, val] = part.split('=')
-        if (k.trim() === 'ts') ts = val.trim()
-        if (k.trim() === 'v1') v1 = val.trim()
-      }
-
-      const manifest = `id:${dataId};request-id:${xRequestId};ts:${ts};`
-      const hmac = crypto.createHmac('sha256', secret).update(manifest).digest('hex')
-
-      if (hmac !== v1) {
-        console.warn('Webhook: assinatura inválida')
-        return NextResponse.json({ error: 'Assinatura inválida' }, { status: 401 })
-      }
-    }
     const body = await req.json()
 
-    // Mercado Pago envia notificações de pagamento
+    // Só processa notificações de pagamento
     if (body.type !== 'payment') {
       return NextResponse.json({ received: true })
     }
@@ -39,11 +15,11 @@ export async function POST(req: NextRequest) {
     const paymentId = body.data?.id?.toString()
     if (!paymentId) return NextResponse.json({ received: true })
 
-    // Verifica o status real do pagamento no MP
+    // Verifica o status real do pagamento diretamente no Mercado Pago
+    // Isso é mais seguro que HMAC — confirma na fonte
     const status = await getPaymentStatus(paymentId)
 
     if (status !== 'approved') {
-      // Se expirou, atualiza no banco
       if (status === 'cancelled') {
         await supabaseAdmin
           .from('pedidos')
@@ -81,7 +57,7 @@ export async function POST(req: NextRequest) {
       await supabaseAdmin.rpc('incrementar_uso_cupom', { cupom_id: pedidoFull.cupom_id })
     }
 
-    // Busca dados do usuário para enviar e-mail
+    // Busca dados do usuário e envia e-mail com download
     const { data: user } = await supabaseAdmin
       .from('usuarios')
       .select('nome, email')
