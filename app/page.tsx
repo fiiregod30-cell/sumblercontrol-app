@@ -1,7 +1,26 @@
 import Link from 'next/link'
 import Image from 'next/image'
+import { supabaseAdmin } from '@/lib/supabase'
 
-export default function Home() {
+async function getConfig() {
+  const { data } = await supabaseAdmin
+    .from('config_site')
+    .select('preco, produto_nome, imagem_url')
+    .eq('id', 1)
+    .single()
+  return {
+    preco: data?.preco ?? 31.99,
+    nome: data?.produto_nome ?? 'SumblerControl',
+    imagem: data?.imagem_url || '/assets/SumblerControl.png',
+  }
+}
+
+export const revalidate = 60 // revalida a cada 60 segundos
+
+export default async function Home() {
+  const cfg = await getConfig()
+  const precoStr = cfg.preco.toFixed(2).replace('.', ',')
+
   return (
     <div style={{ background: '#090F1A', color: '#F1F5FA', fontFamily: 'Inter, sans-serif' }}>
 
@@ -45,7 +64,7 @@ export default function Home() {
           </p>
           <div style={{ display: 'flex', gap: '14px', justifyContent: 'center', flexWrap: 'wrap', marginBottom: '56px' }}>
             <Link href="/registro" style={{ display: 'inline-flex', alignItems: 'center', gap: '8px', padding: '14px 28px', background: '#3B82F6', color: '#fff', borderRadius: '10px', textDecoration: 'none', fontSize: '15px', fontWeight: '700' }}>
-              ⚡ Assinar por R$ 31,99/mês
+              ⚡ Assinar por R$ {precoStr}/mês
             </Link>
             <a href="#features" style={{ display: 'inline-flex', alignItems: 'center', gap: '8px', padding: '14px 28px', background: 'transparent', color: '#F1F5FA', borderRadius: '10px', textDecoration: 'none', fontSize: '15px', fontWeight: '600', border: '1px solid #243044' }}>
               Ver recursos →
@@ -127,9 +146,9 @@ export default function Home() {
               <h3 style={{ fontSize: '18px', color: '#647489', marginBottom: '16px' }}>Plano Mensal</h3>
               <div style={{ display: 'flex', alignItems: 'flex-start', gap: '4px', marginBottom: '28px' }}>
                 <span style={{ fontSize: '20px', fontWeight: '700', marginTop: '8px' }}>R$</span>
-                <span style={{ fontSize: '72px', fontWeight: '900', lineHeight: 1, letterSpacing: '-0.04em' }}>31</span>
+                <span style={{ fontSize: '72px', fontWeight: '900', lineHeight: 1, letterSpacing: '-0.04em' }}>{precoStr.split(',')[0]}</span>
                 <div style={{ paddingBottom: '8px', display: 'flex', flexDirection: 'column', justifyContent: 'flex-end' }}>
-                  <span style={{ fontSize: '20px', fontWeight: '700' }}>,99</span>
+                  <span style={{ fontSize: '20px', fontWeight: '700' }}>,{precoStr.split(',')[1]}</span>
                   <span style={{ fontSize: '14px', color: '#647489' }}>/mês</span>
                 </div>
               </div>
@@ -184,7 +203,7 @@ export default function Home() {
           </h2>
           <p style={{ fontSize: '17px', color: '#647489', marginBottom: '32px' }}>Junte-se aos gamers que já desbloquearam a performance real do seu PC.</p>
           <Link href="/registro" style={{ display: 'inline-flex', alignItems: 'center', gap: '8px', padding: '16px 32px', background: '#3B82F6', color: '#fff', borderRadius: '10px', textDecoration: 'none', fontSize: '16px', fontWeight: '700' }}>
-            ⚡ Assinar por R$ 31,99/mês
+            ⚡ Assinar por R$ {precoStr}/mês
           </Link>
         </div>
       </section>
