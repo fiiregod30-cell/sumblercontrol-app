@@ -1,13 +1,13 @@
 'use client'
 import { useState } from 'react'
-import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 
 export default function RegistroPage() {
-  const router = useRouter()
   const [form, setForm] = useState({ nome: '', sobrenome: '', telefone: '', email: '', senha: '', confirmarSenha: '' })
   const [erro, setErro] = useState('')
   const [loading, setLoading] = useState(false)
+  const [enviado, setEnviado] = useState(false)
+  const [emailEnviado, setEmailEnviado] = useState('')
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
@@ -21,15 +21,52 @@ export default function RegistroPage() {
         body: JSON.stringify({ nome: form.nome, sobrenome: form.sobrenome, telefone: form.telefone, email: form.email, senha: form.senha })
       })
       const data = await res.json()
-      if (!res.ok) { setErro(data.error || 'Erro ao criar conta'); return }
-      router.push('/checkout')
+      if (!res.ok && res.status !== 200) { setErro(data.error || 'Erro ao criar conta'); return }
+      // Sucesso — mostra tela de confirmação pendente
+      setEmailEnviado(form.email)
+      setEnviado(true)
     } catch { setErro('Erro de conexão') } finally { setLoading(false) }
+  }
+
+  // Tela de confirmação pendente
+  if (enviado) {
+    return (
+      <div style={{ minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '24px', background: '#090F1A' }}>
+        <div style={{ width: '100%', maxWidth: '440px', textAlign: 'center' }}>
+          <div style={{ width: '72px', height: '72px', background: 'rgba(59,130,246,0.12)', border: '2px solid rgba(59,130,246,0.4)', borderRadius: '50%', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', marginBottom: '24px', fontSize: '32px' }}>📧</div>
+          <h1 style={{ fontSize: '24px', fontWeight: '800', marginBottom: '12px' }}>Confirme seu e-mail</h1>
+          <p style={{ color: '#647489', fontSize: '15px', lineHeight: 1.7, marginBottom: '8px' }}>
+            Enviamos um link de confirmação para:
+          </p>
+          <p style={{ color: '#3B82F6', fontWeight: '600', fontSize: '15px', marginBottom: '24px' }}>{emailEnviado}</p>
+          <div style={{ background: '#111826', border: '1px solid #1E2939', borderRadius: '12px', padding: '20px', marginBottom: '24px' }}>
+            <p style={{ color: '#647489', fontSize: '13px', lineHeight: 1.7 }}>
+              Abra o e-mail e clique em <strong style={{ color: '#F1F5FA' }}>"Confirmar meu e-mail"</strong> para ativar sua conta. O link é válido por 24 horas.
+            </p>
+          </div>
+          <p style={{ color: '#647489', fontSize: '13px' }}>
+            Não recebeu?{' '}
+            <button
+              onClick={async () => {
+                await fetch('/api/auth/reenviar-confirmacao', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ email: emailEnviado }) })
+                alert('E-mail reenviado! Verifique sua caixa de entrada.')
+              }}
+              style={{ color: '#3B82F6', background: 'none', border: 'none', cursor: 'pointer', fontSize: '13px', textDecoration: 'underline' }}
+            >
+              Reenviar e-mail
+            </button>
+          </p>
+          <p style={{ marginTop: '20px' }}>
+            <Link href="/login" style={{ color: '#647489', fontSize: '13px', textDecoration: 'none' }}>← Ir para o login</Link>
+          </p>
+        </div>
+      </div>
+    )
   }
 
   return (
     <div style={{ minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '24px', background: '#090F1A' }}>
       <div style={{ width: '100%', maxWidth: '440px' }}>
-        {/* Logo */}
         <div style={{ textAlign: 'center', marginBottom: '32px' }}>
           <div style={{ width: '48px', height: '48px', background: 'rgba(59,130,246,0.12)', border: '1px solid rgba(59,130,246,0.3)', borderRadius: '12px', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', marginBottom: '12px' }}>
             <svg width="24" height="24" viewBox="0 0 24 24" fill="none"><circle cx="12" cy="12" r="9" stroke="#3B82F6" strokeWidth="2"/><circle cx="12" cy="12" r="4" stroke="#3B82F6" strokeWidth="2"/></svg>
@@ -38,7 +75,6 @@ export default function RegistroPage() {
           <p style={{ color: '#647489', fontSize: '14px' }}>Crie sua conta para acessar o SumblerControl</p>
         </div>
 
-        {/* Form */}
         <form onSubmit={handleSubmit} style={{ background: '#111826', border: '1px solid #1E2939', borderRadius: '16px', padding: '32px', display: 'flex', flexDirection: 'column', gap: '16px' }}>
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
             <div>

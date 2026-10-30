@@ -1,18 +1,27 @@
 'use client'
-import { useState } from 'react'
-import { useRouter } from 'next/navigation'
+import { useState, useEffect, Suspense } from 'react'
+import { useRouter, useSearchParams } from 'next/navigation'
 import Link from 'next/link'
 
-export default function LoginPage() {
+function LoginContent() {
   const router = useRouter()
+  const params = useSearchParams()
   const [form, setForm] = useState({ email: '', senha: '' })
   const [erro, setErro] = useState('')
+  const [sucesso, setSucesso] = useState('')
   const [loading, setLoading] = useState(false)
+  const [naoConfirmado, setNaoConfirmado] = useState(false)
+
+  useEffect(() => {
+    if (params.get('confirmado')) setSucesso('E-mail confirmado com sucesso! Faça login.')
+    if (params.get('erro') === 'token-expirado') setErro('Link expirado. Cadastre-se novamente.')
+    if (params.get('erro') === 'token-usado') setSucesso('Link já utilizado. Faça login normalmente.')
+    if (params.get('erro') === 'token-invalido') setErro('Link inválido. Tente novamente.')
+  }, [params])
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
-    setErro('')
-    setLoading(true)
+    setErro(''); setSucesso(''); setNaoConfirmado(false); setLoading(true)
     try {
       const res = await fetch('/api/auth/login', {
         method: 'POST',
@@ -20,9 +29,24 @@ export default function LoginPage() {
         body: JSON.stringify(form)
       })
       const data = await res.json()
-      if (!res.ok) { setErro(data.error || 'Erro ao fazer login'); return }
+      if (!res.ok) {
+        if (data.naoConfirmado) setNaoConfirmado(true)
+        setErro(data.error || 'Erro ao fazer login')
+        return
+      }
       router.push('/checkout')
     } catch { setErro('Erro de conexão') } finally { setLoading(false) }
+  }
+
+  async function reenviarEmail() {
+    if (!form.email) { setErro('Digite seu e-mail primeiro'); return }
+    const res = await fetch('/api/auth/reenviar-confirmacao', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ email: form.email })
+    })
+    if (res.ok) { setSucesso('E-mail de confirmação reenviado! Verifique sua caixa de entrada.'); setErro(''); setNaoConfirmado(false) }
+    else setErro('Não foi possível reenviar. Tente novamente.')
   }
 
   return (
@@ -37,6 +61,11 @@ export default function LoginPage() {
         </div>
 
         <form onSubmit={handleSubmit} style={{ background: '#111826', border: '1px solid #1E2939', borderRadius: '16px', padding: '32px', display: 'flex', flexDirection: 'column', gap: '16px' }}>
+          {sucesso && (
+            <div style={{ background: 'rgba(34,197,94,0.1)', border: '1px solid rgba(34,197,94,0.3)', borderRadius: '8px', padding: '12px', fontSize: '13px', color: '#22C55E' }}>
+              {sucesso}
+            </div>
+          )}
           <div>
             <label style={{ display: 'block', fontSize: '13px', color: '#647489', marginBottom: '6px' }}>E-mail</label>
             <input type="email" value={form.email} onChange={e => setForm(p => ({ ...p, email: e.target.value }))} placeholder="seu@email.com" required style={inputStyle} />
@@ -45,7 +74,16 @@ export default function LoginPage() {
             <label style={{ display: 'block', fontSize: '13px', color: '#647489', marginBottom: '6px' }}>Senha</label>
             <input type="password" value={form.senha} onChange={e => setForm(p => ({ ...p, senha: e.target.value }))} placeholder="Sua senha" required style={inputStyle} />
           </div>
-          {erro && <div style={{ background: 'rgba(239,68,68,0.1)', border: '1px solid rgba(239,68,68,0.3)', borderRadius: '8px', padding: '12px', fontSize: '13px', color: '#EF4444' }}>{erro}</div>}
+          {erro && (
+            <div style={{ background: 'rgba(239,68,68,0.1)', border: '1px solid rgba(239,68,68,0.3)', borderRadius: '8px', padding: '12px', fontSize: '13px', color: '#EF4444' }}>
+              {erro}
+              {naoConfirmado && (
+                <button type="button" onClick={reenviarEmail} style={{ display: 'block', marginTop: '8px', color: '#3B82F6', background: 'none', border: 'none', cursor: 'pointer', fontSize: '13px', padding: 0 }}>
+                  Reenviar e-mail de confirmação →
+                </button>
+              )}
+            </div>
+          )}
           <button type="submit" disabled={loading} style={btnStyle}>
             {loading ? 'Entrando...' : 'Entrar'}
           </button>
@@ -61,6 +99,10 @@ export default function LoginPage() {
       </div>
     </div>
   )
+}
+
+export default function LoginPage() {
+  return <Suspense><LoginContent /></Suspense>
 }
 
 const inputStyle: React.CSSProperties = {

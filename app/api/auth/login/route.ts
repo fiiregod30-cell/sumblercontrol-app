@@ -9,10 +9,9 @@ export async function POST(req: NextRequest) {
     if (!email || !senha)
       return NextResponse.json({ error: 'E-mail e senha são obrigatórios' }, { status: 400 })
 
-    // Busca usuário
     const { data: user } = await supabaseAdmin
       .from('usuarios')
-      .select('id, nome, sobrenome, email, senha_hash, ativo')
+      .select('id, nome, sobrenome, email, senha_hash, ativo, email_confirmado')
       .eq('email', email.toLowerCase())
       .single()
 
@@ -25,6 +24,14 @@ export async function POST(req: NextRequest) {
     const senhaOk = await comparePassword(senha, user.senha_hash)
     if (!senhaOk)
       return NextResponse.json({ error: 'E-mail ou senha incorretos' }, { status: 401 })
+
+    // Bloqueia se e-mail não confirmado
+    if (!user.email_confirmado) {
+      return NextResponse.json({
+        error: 'Confirme seu e-mail antes de entrar. Verifique sua caixa de entrada.',
+        naoConfirmado: true
+      }, { status: 403 })
+    }
 
     const token = signToken({ id: user.id, email: user.email, role: 'user' })
 
