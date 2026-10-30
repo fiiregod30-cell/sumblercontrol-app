@@ -1,0 +1,252 @@
+'use client'
+import { useState, useEffect } from 'react'
+import { useRouter } from 'next/navigation'
+
+interface Cupom {
+  id: string; codigo: string; tipo: string; valor: number
+  usos_maximos: number | null; usos_atuais: number; expira_em: string | null; ativo: boolean
+}
+interface Stats { usuarios: number; vendas: number; receita: number }
+
+export default function AdminDashboard() {
+  const router = useRouter()
+  const [aba, setAba] = useState<'dashboard'|'cupons'|'usuarios'|'vendas'>('dashboard')
+  const [stats, setStats] = useState<Stats>({ usuarios: 0, vendas: 0, receita: 0 })
+  const [cupons, setCupons] = useState<Cupom[]>([])
+  const [usuarios, setUsuarios] = useState<{id:string;nome:string;sobrenome:string;email:string;telefone:string;criado_em:string}[]>([])
+  const [pedidos, setPedidos] = useState<{id:string;valor_final:number;status:string;criado_em:string;usuario_id:string}[]>([])
+  const [novoCupom, setNovoCupom] = useState({ codigo: '', tipo: 'porcentagem', valor: '', usos_maximos: '', expira_em: '' })
+  const [cupomMsg, setCupomMsg] = useState('')
+
+  useEffect(() => { carregarDados() }, [aba])
+
+  async function carregarDados() {
+    try {
+      const res = await fetch('/api/admin/dados?tipo=' + aba, { credentials: 'include' })
+      if (res.status === 401) { router.push('/admin'); return }
+      const data = await res.json()
+      if (aba === 'dashboard') setStats(data)
+      if (aba === 'cupons') setCupons(data)
+      if (aba === 'usuarios') setUsuarios(data)
+      if (aba === 'vendas') setPedidos(data)
+    } catch { /* silencioso */ }
+  }
+
+  async function criarCupom(e: React.FormEvent) {
+    e.preventDefault(); setCupomMsg('')
+    const res = await fetch('/api/admin/cupons', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ ...novoCupom, valor: parseFloat(novoCupom.valor), usos_maximos: novoCupom.usos_maximos ? parseInt(novoCupom.usos_maximos) : null, expira_em: novoCupom.expira_em || null })
+    })
+    const data = await res.json()
+    if (res.ok) { setCupomMsg('✓ Cupom criado com sucesso!'); setNovoCupom({ codigo: '', tipo: 'porcentagem', valor: '', usos_maximos: '', expira_em: '' }); carregarDados() }
+    else setCupomMsg('✗ ' + data.error)
+  }
+
+  async function toggleCupom(id: string, ativo: boolean) {
+    await fetch('/api/admin/cupons', { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ id, ativo: !ativo }) })
+    carregarDados()
+  }
+
+  async function reenviarEmail(userId: string) {
+    await fetch('/api/admin/reenviar', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ userId }) })
+    alert('E-mail reenviado!')
+  }
+
+  async function logout() {
+    await fetch('/api/auth/logout', { method: 'POST' })
+    router.push('/admin')
+  }
+
+  const abas = [
+    { id: 'dashboard', label: '📊 Dashboard' },
+    { id: 'cupons', label: '🏷️ Cupons' },
+    { id: 'usuarios', label: '👥 Usuários' },
+    { id: 'vendas', label: '💰 Vendas' },
+  ]
+
+  return (
+    <div style={{ minHeight: '100vh', background: '#090F1A', color: '#F1F5FA' }}>
+      {/* Sidebar */}
+      <div style={{ display: 'flex' }}>
+        <div style={{ width: '220px', minHeight: '100vh', background: '#0D1420', borderRight: '1px solid #1E2939', padding: '24px 16px', display: 'flex', flexDirection: 'column' }}>
+          <div style={{ marginBottom: '32px' }}>
+            <div style={{ fontSize: '16px', fontWeight: '800', color: '#FBBF24', marginBottom: '4px' }}>⚙️ Admin</div>
+            <div style={{ fontSize: '12px', color: '#647489' }}>SumblerControl</div>
+          </div>
+          {abas.map(a => (
+            <button key={a.id} onClick={() => setAba(a.id as 'dashboard'|'cupons'|'usuarios'|'vendas')} style={{ textAlign: 'left', padding: '10px 12px', borderRadius: '8px', border: 'none', background: aba === a.id ? 'rgba(59,130,246,0.15)' : 'transparent', color: aba === a.id ? '#3B82F6' : '#647489', fontSize: '14px', fontWeight: aba === a.id ? '600' : '400', cursor: 'pointer', marginBottom: '4px' }}>
+              {a.label}
+            </button>
+          ))}
+          <button onClick={logout} style={{ marginTop: 'auto', padding: '10px 12px', borderRadius: '8px', border: 'none', background: 'transparent', color: '#EF4444', fontSize: '14px', cursor: 'pointer', textAlign: 'left' }}>
+            🚪 Sair
+          </button>
+        </div>
+
+        {/* Conteúdo */}
+        <div style={{ flex: 1, padding: '32px', overflowY: 'auto' }}>
+
+          {/* Dashboard */}
+          {aba === 'dashboard' && (
+            <div>
+              <h2 style={{ fontSize: '20px', fontWeight: '800', marginBottom: '24px' }}>Dashboard</h2>
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '16px', marginBottom: '32px' }}>
+                {[
+                  { label: 'Usuários cadastrados', value: stats.usuarios, cor: '#3B82F6' },
+                  { label: 'Vendas realizadas', value: stats.vendas, cor: '#22C55E' },
+                  { label: 'Receita total', value: `R$ ${stats.receita.toFixed(2)}`, cor: '#FBBF24' },
+                ].map(s => (
+                  <div key={s.label} style={{ background: '#111826', border: '1px solid #1E2939', borderRadius: '12px', padding: '20px' }}>
+                    <p style={{ color: '#647489', fontSize: '13px', marginBottom: '8px' }}>{s.label}</p>
+                    <p style={{ fontSize: '28px', fontWeight: '800', color: s.cor }}>{s.value}</p>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* Cupons */}
+          {aba === 'cupons' && (
+            <div>
+              <h2 style={{ fontSize: '20px', fontWeight: '800', marginBottom: '24px' }}>Gerenciar Cupons</h2>
+              {/* Form novo cupom */}
+              <div style={{ background: '#111826', border: '1px solid #1E2939', borderRadius: '12px', padding: '24px', marginBottom: '24px' }}>
+                <h3 style={{ fontSize: '16px', fontWeight: '700', marginBottom: '16px' }}>Novo Cupom</h3>
+                <form onSubmit={criarCupom} style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '12px' }}>
+                  <div>
+                    <label style={labelStyle}>Código</label>
+                    <input value={novoCupom.codigo} onChange={e => setNovoCupom(p => ({ ...p, codigo: e.target.value.toUpperCase() }))} placeholder="EX: PROMO30" required style={inputStyle} />
+                  </div>
+                  <div>
+                    <label style={labelStyle}>Tipo</label>
+                    <select value={novoCupom.tipo} onChange={e => setNovoCupom(p => ({ ...p, tipo: e.target.value }))} style={inputStyle}>
+                      <option value="porcentagem">% Desconto</option>
+                      <option value="reais">R$ Fixo</option>
+                    </select>
+                  </div>
+                  <div>
+                    <label style={labelStyle}>Valor ({novoCupom.tipo === 'porcentagem' ? '%' : 'R$'})</label>
+                    <input type="number" value={novoCupom.valor} onChange={e => setNovoCupom(p => ({ ...p, valor: e.target.value }))} placeholder={novoCupom.tipo === 'porcentagem' ? '30' : '10.00'} required style={inputStyle} />
+                  </div>
+                  <div>
+                    <label style={labelStyle}>Usos máximos (deixe vazio = ilimitado)</label>
+                    <input type="number" value={novoCupom.usos_maximos} onChange={e => setNovoCupom(p => ({ ...p, usos_maximos: e.target.value }))} placeholder="100" style={inputStyle} />
+                  </div>
+                  <div>
+                    <label style={labelStyle}>Expira em (opcional)</label>
+                    <input type="date" value={novoCupom.expira_em} onChange={e => setNovoCupom(p => ({ ...p, expira_em: e.target.value }))} style={inputStyle} />
+                  </div>
+                  <div style={{ display: 'flex', alignItems: 'flex-end' }}>
+                    <button type="submit" style={{ width: '100%', padding: '10px', background: '#3B82F6', color: '#fff', border: 'none', borderRadius: '8px', fontSize: '14px', fontWeight: '600', cursor: 'pointer' }}>
+                      Criar Cupom
+                    </button>
+                  </div>
+                </form>
+                {cupomMsg && <p style={{ marginTop: '12px', fontSize: '13px', color: cupomMsg.startsWith('✓') ? '#22C55E' : '#EF4444' }}>{cupomMsg}</p>}
+              </div>
+              {/* Lista de cupons */}
+              <div style={{ background: '#111826', border: '1px solid #1E2939', borderRadius: '12px', overflow: 'hidden' }}>
+                <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+                  <thead><tr style={{ background: '#151D2C' }}>
+                    {['Código', 'Tipo', 'Valor', 'Usos', 'Expira', 'Status', 'Ação'].map(h => (
+                      <th key={h} style={{ padding: '12px 16px', textAlign: 'left', fontSize: '12px', color: '#647489', fontWeight: '600' }}>{h}</th>
+                    ))}
+                  </tr></thead>
+                  <tbody>
+                    {cupons.map(c => (
+                      <tr key={c.id} style={{ borderTop: '1px solid #1E2939' }}>
+                        <td style={{ padding: '12px 16px', fontFamily: 'monospace', color: '#3B82F6' }}>{c.codigo}</td>
+                        <td style={{ padding: '12px 16px', fontSize: '13px', color: '#647489' }}>{c.tipo === 'porcentagem' ? '%' : 'R$'}</td>
+                        <td style={{ padding: '12px 16px', fontSize: '13px' }}>{c.tipo === 'porcentagem' ? `${c.valor}%` : `R$ ${c.valor}`}</td>
+                        <td style={{ padding: '12px 16px', fontSize: '13px' }}>{c.usos_atuais}/{c.usos_maximos ?? '∞'}</td>
+                        <td style={{ padding: '12px 16px', fontSize: '13px', color: '#647489' }}>{c.expira_em ? new Date(c.expira_em).toLocaleDateString('pt-BR') : '—'}</td>
+                        <td style={{ padding: '12px 16px' }}>
+                          <span style={{ padding: '3px 8px', borderRadius: '999px', fontSize: '12px', background: c.ativo ? 'rgba(34,197,94,0.1)' : 'rgba(239,68,68,0.1)', color: c.ativo ? '#22C55E' : '#EF4444' }}>
+                            {c.ativo ? 'Ativo' : 'Inativo'}
+                          </span>
+                        </td>
+                        <td style={{ padding: '12px 16px' }}>
+                          <button onClick={() => toggleCupom(c.id, c.ativo)} style={{ padding: '4px 10px', background: '#151D2C', border: '1px solid #243044', borderRadius: '6px', color: '#F1F5FA', fontSize: '12px', cursor: 'pointer' }}>
+                            {c.ativo ? 'Desativar' : 'Ativar'}
+                          </button>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          )}
+
+          {/* Usuários */}
+          {aba === 'usuarios' && (
+            <div>
+              <h2 style={{ fontSize: '20px', fontWeight: '800', marginBottom: '24px' }}>Usuários ({usuarios.length})</h2>
+              <div style={{ background: '#111826', border: '1px solid #1E2939', borderRadius: '12px', overflow: 'hidden' }}>
+                <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+                  <thead><tr style={{ background: '#151D2C' }}>
+                    {['Nome', 'E-mail', 'Telefone', 'Cadastro', 'Ação'].map(h => (
+                      <th key={h} style={{ padding: '12px 16px', textAlign: 'left', fontSize: '12px', color: '#647489', fontWeight: '600' }}>{h}</th>
+                    ))}
+                  </tr></thead>
+                  <tbody>
+                    {usuarios.map(u => (
+                      <tr key={u.id} style={{ borderTop: '1px solid #1E2939' }}>
+                        <td style={{ padding: '12px 16px', fontSize: '14px' }}>{u.nome} {u.sobrenome}</td>
+                        <td style={{ padding: '12px 16px', fontSize: '13px', color: '#647489' }}>{u.email}</td>
+                        <td style={{ padding: '12px 16px', fontSize: '13px', color: '#647489' }}>{u.telefone}</td>
+                        <td style={{ padding: '12px 16px', fontSize: '13px', color: '#647489' }}>{new Date(u.criado_em).toLocaleDateString('pt-BR')}</td>
+                        <td style={{ padding: '12px 16px' }}>
+                          <button onClick={() => reenviarEmail(u.id)} style={{ padding: '4px 10px', background: '#151D2C', border: '1px solid #243044', borderRadius: '6px', color: '#F1F5FA', fontSize: '12px', cursor: 'pointer' }}>
+                            Reenviar
+                          </button>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          )}
+
+          {/* Vendas */}
+          {aba === 'vendas' && (
+            <div>
+              <h2 style={{ fontSize: '20px', fontWeight: '800', marginBottom: '24px' }}>Vendas</h2>
+              <div style={{ background: '#111826', border: '1px solid #1E2939', borderRadius: '12px', overflow: 'hidden' }}>
+                <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+                  <thead><tr style={{ background: '#151D2C' }}>
+                    {['Pedido', 'Valor', 'Status', 'Data'].map(h => (
+                      <th key={h} style={{ padding: '12px 16px', textAlign: 'left', fontSize: '12px', color: '#647489', fontWeight: '600' }}>{h}</th>
+                    ))}
+                  </tr></thead>
+                  <tbody>
+                    {pedidos.map(p => (
+                      <tr key={p.id} style={{ borderTop: '1px solid #1E2939' }}>
+                        <td style={{ padding: '12px 16px', fontFamily: 'monospace', fontSize: '13px', color: '#3B82F6' }}>#{p.id.slice(0,8).toUpperCase()}</td>
+                        <td style={{ padding: '12px 16px', fontSize: '14px', fontWeight: '600' }}>R$ {p.valor_final.toFixed(2)}</td>
+                        <td style={{ padding: '12px 16px' }}>
+                          <span style={{ padding: '3px 8px', borderRadius: '999px', fontSize: '12px', background: p.status === 'pago' ? 'rgba(34,197,94,0.1)' : p.status === 'pendente' ? 'rgba(251,191,36,0.1)' : 'rgba(239,68,68,0.1)', color: p.status === 'pago' ? '#22C55E' : p.status === 'pendente' ? '#FBBF24' : '#EF4444' }}>
+                            {p.status}
+                          </span>
+                        </td>
+                        <td style={{ padding: '12px 16px', fontSize: '13px', color: '#647489' }}>{new Date(p.criado_em).toLocaleDateString('pt-BR')}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          )}
+        </div>
+      </div>
+    </div>
+  )
+}
+
+const inputStyle: React.CSSProperties = {
+  width: '100%', padding: '9px 12px', background: '#151D2C', border: '1px solid #1E2939',
+  borderRadius: '8px', color: '#F1F5FA', fontSize: '13px', outline: 'none',
+}
+const labelStyle: React.CSSProperties = { display: 'block', fontSize: '12px', color: '#647489', marginBottom: '5px' }
