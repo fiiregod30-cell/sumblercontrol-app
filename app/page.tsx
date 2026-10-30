@@ -15,7 +15,8 @@ async function getConfig() {
   }
 }
 
-export const revalidate = 60 // revalida a cada 60 segundos
+export const revalidate = 0
+export const dynamic = 'force-dynamic'
 
 export default async function Home() {
   const cfg = await getConfig()

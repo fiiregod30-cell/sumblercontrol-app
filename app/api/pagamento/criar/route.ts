@@ -53,8 +53,9 @@ export async function POST(req: NextRequest) {
         .eq('id', pedidoPendente.id)
     }
 
-    // Calcula valor
-    let valorOriginal = 31.99
+    // Calcula valor buscando preço atual do banco
+    const { data: cfgData } = await supabaseAdmin.from('config_site').select('preco').eq('id', 1).single()
+    let valorOriginal = cfgData?.preco ?? 31.99
     let valorDesconto = 0
     let valorFinal = valorOriginal
     let cupomUsado = null

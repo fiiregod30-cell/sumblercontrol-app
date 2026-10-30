@@ -12,12 +12,21 @@ export default function CheckoutPage() {
   const [pedidoId, setPedidoId] = useState('')
   const [qrCode, setQrCode] = useState('')
   const [copiaCola, setCopiaCola] = useState('')
-  const [valorFinal, setValorFinal] = useState(31.99)
+  const [valorFinal, setValorFinal] = useState(0)
+  const [precoBase, setPrecoBase] = useState(0)
   const [loading, setLoading] = useState(false)
   const [erro, setErro] = useState('')
   const [copiado, setCopiado] = useState(false)
   const [timer, setTimer] = useState(0)
   const [statusPago, setStatusPago] = useState(false)
+
+  // Busca o preço atual do banco
+  useEffect(() => {
+    fetch('/api/config-publica')
+      .then(r => r.json())
+      .then(d => { setPrecoBase(d.preco); setValorFinal(d.preco) })
+      .catch(() => { setPrecoBase(31.99); setValorFinal(31.99) })
+  }, [])
 
   // Polling de status do pagamento
   const checkStatus = useCallback(async () => {
