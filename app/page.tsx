@@ -15,8 +15,6 @@ async function getConfig() {
   }
 }
 
-export const dynamic = 'force-dynamic'
-
 export default async function Home() {
   const cfg = await getConfig()
   const precoStr = cfg.preco.toFixed(2).replace('.', ',')
