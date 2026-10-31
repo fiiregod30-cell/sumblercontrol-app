@@ -29,7 +29,7 @@ export default function AdminDashboard() {
   const [licencaMsg, setLicencaMsg] = useState('')
   const [cupons, setCupons] = useState<Cupom[]>([])
   const [usuarios, setUsuarios] = useState<{id:string;nome:string;sobrenome:string;email:string;telefone:string;criado_em:string}[]>([])
-  const [pedidos, setPedidos] = useState<{id:string;valor_final:number;status:string;criado_em:string;usuario_id:string}[]>([])
+  const [pedidos, setPedidos] = useState<{id:string;valor_original:number;valor_desconto:number;valor_final:number;status:string;criado_em:string;usuario_id:string;cupons:{codigo:string}|null}[]>([])
   const [novoCupom, setNovoCupom] = useState({ codigo: '', tipo: 'porcentagem', valor: '', usos_maximos: '', expira_em: '' })
   const [cupomMsg, setCupomMsg] = useState('')
   const [config, setConfig] = useState<Config>({ preco: 31.99, imagem_url: '', link_download: '', produto_nome: 'SumblerControl' })
@@ -306,7 +306,7 @@ export default function AdminDashboard() {
               <div style={{ background: '#111826', border: '1px solid #1E2939', borderRadius: '12px', overflow: 'hidden' }}>
                 <table style={{ width: '100%', borderCollapse: 'collapse' }}>
                   <thead><tr style={{ background: '#151D2C' }}>
-                    {['Pedido', 'Valor', 'Status', 'Data'].map(h => (
+                    {['Pedido', 'Valor', 'Desconto', 'Cupom', 'Status', 'Data'].map(h => (
                       <th key={h} style={{ padding: '12px 16px', textAlign: 'left', fontSize: '12px', color: '#647489', fontWeight: '600' }}>{h}</th>
                     ))}
                   </tr></thead>
@@ -314,7 +314,26 @@ export default function AdminDashboard() {
                     {pedidos.map(p => (
                       <tr key={p.id} style={{ borderTop: '1px solid #1E2939' }}>
                         <td style={{ padding: '12px 16px', fontFamily: 'monospace', fontSize: '13px', color: '#3B82F6' }}>#{p.id.slice(0,8).toUpperCase()}</td>
-                        <td style={{ padding: '12px 16px', fontSize: '14px', fontWeight: '600' }}>R$ {p.valor_final.toFixed(2)}</td>
+                        <td style={{ padding: '12px 16px', fontSize: '14px', fontWeight: '600' }}>
+                          R$ {p.valor_final.toFixed(2)}
+                          {p.valor_original && p.valor_original > p.valor_final && (
+                            <span style={{ fontSize: '11px', color: '#647489', marginLeft: '4px', textDecoration: 'line-through' }}>
+                              R$ {p.valor_original.toFixed(2)}
+                            </span>
+                          )}
+                        </td>
+                        <td style={{ padding: '12px 16px', fontSize: '13px' }}>
+                          {p.valor_desconto > 0
+                            ? <span style={{ color: '#22C55E' }}>-R$ {p.valor_desconto.toFixed(2)}</span>
+                            : <span style={{ color: '#647489' }}>—</span>
+                          }
+                        </td>
+                        <td style={{ padding: '12px 16px' }}>
+                          {p.cupons?.codigo
+                            ? <span style={{ fontFamily: 'monospace', fontSize: '12px', color: '#FBBF24', background: 'rgba(251,191,36,0.08)', padding: '2px 8px', borderRadius: '4px' }}>{p.cupons.codigo}</span>
+                            : <span style={{ color: '#647489', fontSize: '12px' }}>—</span>
+                          }
+                        </td>
                         <td style={{ padding: '12px 16px' }}>
                           <span style={{ padding: '3px 8px', borderRadius: '999px', fontSize: '12px', background: p.status === 'pago' ? 'rgba(34,197,94,0.1)' : p.status === 'pendente' ? 'rgba(251,191,36,0.1)' : 'rgba(239,68,68,0.1)', color: p.status === 'pago' ? '#22C55E' : p.status === 'pendente' ? '#FBBF24' : '#EF4444' }}>
                             {p.status}

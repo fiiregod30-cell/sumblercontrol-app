@@ -37,7 +37,11 @@ export async function GET(req: NextRequest) {
   }
 
   if (tipo === 'vendas') {
-    const { data } = await supabaseAdmin.from('pedidos').select('id, valor_final, status, criado_em, usuario_id').order('criado_em', { ascending: false }).limit(100)
+    const { data } = await supabaseAdmin
+      .from('pedidos')
+      .select('id, valor_original, valor_desconto, valor_final, status, criado_em, usuario_id, cupons(codigo)')
+      .order('criado_em', { ascending: false })
+      .limit(100)
     return NextResponse.json(data || [])
   }
 
