@@ -17,6 +17,7 @@ interface Usuario {
   sobrenome: string
   email: string
   telefone: string
+  username: string
 }
 
 interface Licenca {
@@ -103,6 +104,7 @@ export default function MinhaContaPage() {
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
             {[
               { label: 'Nome', value: `${usuario?.nome} ${usuario?.sobrenome}` },
+              { label: 'Usuário', value: usuario?.username || '—' },
               { label: 'E-mail', value: usuario?.email },
               { label: 'Telefone', value: usuario?.telefone },
             ].map(item => (
@@ -187,27 +189,49 @@ export default function MinhaContaPage() {
           ) : (
             <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
               {pedidos.map(p => (
-                <div key={p.id} style={{ background: '#151D2C', border: '1px solid #1E2939', borderRadius: '10px', padding: '16px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '12px' }}>
-                  <div>
-                    <p style={{ fontFamily: 'monospace', fontSize: '13px', color: '#3B82F6', marginBottom: '4px' }}>
-                      #{p.id.slice(0, 8).toUpperCase()}
-                    </p>
-                    <p style={{ fontSize: '13px', color: '#647489' }}>
-                      {new Date(p.criado_em).toLocaleDateString('pt-BR')}
-                    </p>
+                <div key={p.id} style={{ background: '#151D2C', border: '1px solid #1E2939', borderRadius: '10px', padding: '16px' }}>
+                  {/* Linha principal */}
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '12px', marginBottom: p.status === 'pago' ? '12px' : '0' }}>
+                    <div>
+                      <p style={{ fontFamily: 'monospace', fontSize: '13px', color: '#3B82F6', marginBottom: '2px' }}>
+                        #{p.id.slice(0, 8).toUpperCase()}
+                      </p>
+                      <p style={{ fontSize: '12px', color: '#647489' }}>
+                        {new Date(p.criado_em).toLocaleDateString('pt-BR')}
+                      </p>
+                    </div>
+                    <div style={{ textAlign: 'center' }}>
+                      <p style={{ fontSize: '16px', fontWeight: '700' }}>R$ {p.valor_final.toFixed(2)}</p>
+                    </div>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                      <span style={{ padding: '4px 10px', borderRadius: '999px', fontSize: '12px', background: p.status === 'pago' ? 'rgba(34,197,94,0.1)' : 'rgba(251,191,36,0.1)', color: p.status === 'pago' ? '#22C55E' : '#FBBF24' }}>
+                        {p.status === 'pago' ? '✓ Pago' : '⏳ Pendente'}
+                      </span>
+                      {p.status === 'pago' && p.link_download && (
+                        <a href={p.link_download} target="_blank" rel="noopener noreferrer" style={{ padding: '6px 14px', background: '#3B82F6', color: '#fff', borderRadius: '8px', textDecoration: 'none', fontSize: '12px', fontWeight: '600' }}>
+                          ⬇️ Baixar
+                        </a>
+                      )}
+                    </div>
                   </div>
-                  <div style={{ textAlign: 'center' }}>
-                    <p style={{ fontSize: '16px', fontWeight: '700' }}>R$ {p.valor_final.toFixed(2)}</p>
-                  </div>
-                  <div>
-                    <span style={{ padding: '4px 10px', borderRadius: '999px', fontSize: '12px', background: p.status === 'pago' ? 'rgba(34,197,94,0.1)' : 'rgba(251,191,36,0.1)', color: p.status === 'pago' ? '#22C55E' : '#FBBF24' }}>
-                      {p.status === 'pago' ? '✓ Pago' : '⏳ Pendente'}
-                    </span>
-                  </div>
-                  {p.status === 'pago' && p.link_download && (
-                    <a href={p.link_download} style={{ padding: '8px 16px', background: '#3B82F6', color: '#fff', borderRadius: '8px', textDecoration: 'none', fontSize: '13px', fontWeight: '600' }}>
-                      ⬇️ Baixar
-                    </a>
+                  {/* Info de acesso — só para pedidos pagos */}
+                  {p.status === 'pago' && licenca && (
+                    <div style={{ borderTop: '1px solid #1E2939', paddingTop: '10px', display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
+                      <span style={{ fontSize: '11px', color: '#647489' }}>Acesso:</span>
+                      {licenca.tipo === 'key' ? (
+                        <span style={{ fontSize: '12px', color: '#3B82F6', fontFamily: 'monospace', background: 'rgba(59,130,246,0.08)', padding: '2px 8px', borderRadius: '4px' }}>
+                          🔑 {licenca.key || 'Key configurada'}
+                        </span>
+                      ) : licenca.tipo === 'usuario_senha' ? (
+                        <span style={{ fontSize: '12px', color: '#22C55E', background: 'rgba(34,197,94,0.08)', padding: '2px 8px', borderRadius: '4px' }}>
+                          👤 Usuário e Senha
+                        </span>
+                      ) : (
+                        <Link href="/obrigado" style={{ fontSize: '12px', color: '#FBBF24', textDecoration: 'none' }}>
+                          ⚠️ Configurar acesso →
+                        </Link>
+                      )}
+                    </div>
                   )}
                 </div>
               ))}

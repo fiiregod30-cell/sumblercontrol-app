@@ -11,10 +11,16 @@ interface Compra {
   link_download: string | null
 }
 
+interface LicencaInfo {
+  tipo: string | null
+  key: string | null
+}
+
 export default function MinhasComprasPage() {
   const router = useRouter()
   const [compras, setCompras] = useState<Compra[]>([])
   const [nomeCompleto, setNomeCompleto] = useState('')
+  const [licenca, setLicenca] = useState<LicencaInfo | null>(null)
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
@@ -32,10 +38,14 @@ export default function MinhasComprasPage() {
       })
       .then(d => {
         if (!d) return
-        // Filtra apenas pedidos pagos
         setCompras(d.pedidos.filter((p: { status: string }) => p.status === 'pago'))
       })
       .finally(() => setLoading(false))
+
+    fetch('/api/minha-licenca', { credentials: 'include' })
+      .then(r => r.json())
+      .then(d => { if (d.licenca) setLicenca(d.licenca) })
+      .catch(() => {})
   }, [router])
 
   if (loading) {
@@ -104,11 +114,30 @@ export default function MinhasComprasPage() {
                     <span style={{ padding: '3px 8px', borderRadius: '999px', fontSize: '12px', background: 'rgba(34,197,94,0.1)', color: '#22C55E' }}>✓ Pago</span>
                   </div>
                   {c.link_download && (
-                    <a href={c.link_download} style={{ padding: '10px 20px', background: '#3B82F6', color: '#fff', borderRadius: '8px', textDecoration: 'none', fontSize: '14px', fontWeight: '700', whiteSpace: 'nowrap' }}>
+                    <a href={c.link_download} target="_blank" rel="noopener noreferrer" style={{ padding: '10px 20px', background: '#3B82F6', color: '#fff', borderRadius: '8px', textDecoration: 'none', fontSize: '14px', fontWeight: '700', whiteSpace: 'nowrap' }}>
                       ⬇️ Baixar
                     </a>
                   )}
                 </div>
+                {/* Info de acesso */}
+                {licenca && (
+                  <div style={{ marginTop: '12px', borderTop: '1px solid #1E2939', paddingTop: '10px', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                    <span style={{ fontSize: '11px', color: '#647489' }}>Acesso:</span>
+                    {licenca.tipo === 'key' ? (
+                      <span style={{ fontSize: '12px', color: '#3B82F6', fontFamily: 'monospace', background: 'rgba(59,130,246,0.08)', padding: '2px 8px', borderRadius: '4px' }}>
+                        🔑 {licenca.key || 'Key configurada'}
+                      </span>
+                    ) : licenca.tipo === 'usuario_senha' ? (
+                      <span style={{ fontSize: '12px', color: '#22C55E', background: 'rgba(34,197,94,0.08)', padding: '2px 8px', borderRadius: '4px' }}>
+                        👤 Usuário e Senha
+                      </span>
+                    ) : (
+                      <Link href="/obrigado" style={{ fontSize: '12px', color: '#FBBF24', textDecoration: 'none' }}>
+                        ⚠️ Configurar acesso →
+                      </Link>
+                    )}
+                  </div>
+                )}
               </div>
             ))}
           </div>
