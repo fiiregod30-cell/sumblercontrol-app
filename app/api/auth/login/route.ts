@@ -12,11 +12,18 @@ export async function POST(req: NextRequest) {
     // Detecta se é e-mail ou username
     const isEmail = login.includes('@')
 
-    const { data: user } = await supabaseAdmin
+    let query = supabaseAdmin
       .from('usuarios')
       .select('id, nome, sobrenome, email, senha_hash, ativo, email_confirmado')
-      .eq(isEmail ? 'email' : 'username', login.toLowerCase())
-      .single()
+
+    if (isEmail) {
+      query = query.eq('email', login.toLowerCase())
+    } else {
+      // Busca por username — só funciona se o usuário tiver username cadastrado
+      query = query.eq('username', login.toLowerCase())
+    }
+
+    const { data: user } = await query.single()
 
     if (!user)
       return NextResponse.json({ error: 'Usuário ou senha incorretos' }, { status: 401 })

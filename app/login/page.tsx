@@ -34,7 +34,11 @@ function LoginContent() {
         setErro(data.error || 'Erro ao fazer login')
         return
       }
-      router.push('/checkout')
+      // Verifica se tem pedido pago → minha-conta, senão → página inicial
+      const contaRes = await fetch('/api/minha-conta', { credentials: 'include' })
+      const contaData = await contaRes.json()
+      const temCompra = contaData?.pedidos?.some((p: { status: string }) => p.status === 'pago')
+      router.push(temCompra ? '/minha-conta' : '/')
     } catch { setErro('Erro de conexão') } finally { setLoading(false) }
   }
 
