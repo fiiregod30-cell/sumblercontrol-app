@@ -36,8 +36,14 @@ export async function POST(req: NextRequest) {
       .single()
 
     if (pedidoPendente) {
-      // Se o pedido existente tem QR Code válido, reutiliza
-      if (pedidoPendente.pix_qr_code && pedidoPendente.pix_copia_cola) {
+      // Se tem cupom novo sendo aplicado, cancela pedido antigo e cria novo
+      if (cupomId) {
+        await supabaseAdmin
+          .from('pedidos')
+          .update({ status: 'cancelado' })
+          .eq('id', pedidoPendente.id)
+      } else if (pedidoPendente.pix_qr_code && pedidoPendente.pix_copia_cola) {
+        // Sem cupom — reutiliza pedido existente com QR Code válido
         return NextResponse.json({
           pedidoId: pedidoPendente.id,
           qrCode: pedidoPendente.pix_qr_code,
@@ -45,12 +51,13 @@ export async function POST(req: NextRequest) {
           valorFinal: pedidoPendente.valor_final,
           existente: true
         })
+      } else {
+        // Pedido corrompido — cancela e cria novo
+        await supabaseAdmin
+          .from('pedidos')
+          .update({ status: 'cancelado' })
+          .eq('id', pedidoPendente.id)
       }
-      // Se não tem QR Code (pedido corrompido), cancela e cria novo
-      await supabaseAdmin
-        .from('pedidos')
-        .update({ status: 'cancelado' })
-        .eq('id', pedidoPendente.id)
     }
 
     // Calcula valor buscando preço atual do banco
