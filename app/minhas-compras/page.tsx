@@ -14,6 +14,7 @@ interface Compra {
 interface LicencaInfo {
   tipo: string | null
   key: string | null
+  pcRegistrado?: boolean
 }
 
 export default function MinhasComprasPage() {
@@ -121,7 +122,7 @@ export default function MinhasComprasPage() {
                 </div>
                 {/* Info de acesso */}
                 {licenca && (
-                  <div style={{ marginTop: '12px', borderTop: '1px solid #1E2939', paddingTop: '10px', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                  <div style={{ marginTop: '12px', borderTop: '1px solid #1E2939', paddingTop: '10px', display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
                     <span style={{ fontSize: '11px', color: '#647489' }}>Acesso:</span>
                     {licenca.tipo === 'key' ? (
                       <span style={{ fontSize: '12px', color: '#3B82F6', fontFamily: 'monospace', background: 'rgba(59,130,246,0.08)', padding: '2px 8px', borderRadius: '4px' }}>
@@ -135,6 +136,12 @@ export default function MinhasComprasPage() {
                       <Link href="/obrigado" style={{ fontSize: '12px', color: '#FBBF24', textDecoration: 'none' }}>
                         ⚠️ Configurar acesso →
                       </Link>
+                    )}
+                    {/* Status de ativação */}
+                    {licenca.tipo && (
+                      <span style={{ fontSize: '11px', padding: '2px 8px', borderRadius: '4px', background: (licenca as LicencaInfo & { pcRegistrado?: boolean }).pcRegistrado ? 'rgba(34,197,94,0.08)' : 'rgba(251,191,36,0.08)', color: (licenca as LicencaInfo & { pcRegistrado?: boolean }).pcRegistrado ? '#22C55E' : '#FBBF24' }}>
+                        {(licenca as LicencaInfo & { pcRegistrado?: boolean }).pcRegistrado ? '✅ Ativado' : '⏳ Aguardando ativação'}
+                      </span>
                     )}
                   </div>
                 )}

@@ -231,6 +231,12 @@ export default function MinhaContaPage() {
                           ⚠️ Configurar acesso →
                         </Link>
                       )}
+                      {/* Status de ativação */}
+                      {licenca.tipo && (
+                        <span style={{ fontSize: '11px', padding: '2px 8px', borderRadius: '4px', background: licenca.pcRegistrado ? 'rgba(34,197,94,0.08)' : 'rgba(251,191,36,0.08)', color: licenca.pcRegistrado ? '#22C55E' : '#FBBF24' }}>
+                          {licenca.pcRegistrado ? '✅ Ativado' : '⏳ Aguardando ativação'}
+                        </span>
+                      )}
                     </div>
                   )}
                 </div>
