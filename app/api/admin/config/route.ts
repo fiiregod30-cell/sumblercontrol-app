@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { supabaseAdmin } from '@/lib/supabase'
 import { verifyToken } from '@/lib/auth'
+import { revalidatePath } from 'next/cache'
 
 function checkAdmin(req: NextRequest) {
   const token = req.cookies.get('sc_admin_token')?.value
@@ -45,6 +46,9 @@ export async function PATCH(req: NextRequest) {
 
   if (error)
     return NextResponse.json({ error: 'Erro ao salvar configurações' }, { status: 500 })
+
+  // Invalida o cache da landing page imediatamente
+  revalidatePath('/')
 
   return NextResponse.json({ success: true })
 }
