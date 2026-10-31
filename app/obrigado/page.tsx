@@ -19,19 +19,23 @@ function ObrigadoContent() {
   const [loadingEscolha, setLoadingEscolha] = useState(false)
 
   useEffect(() => {
-    // Busca link de download do pedido
+    // Busca link de download do pedido (se tiver pedidoId)
     if (pedidoId) {
       fetch(`/api/pagamento/status?pedidoId=${pedidoId}`)
         .then(r => r.json())
         .then(d => { if (d.linkDownload) setDownloadLink(d.linkDownload) })
         .catch(() => {})
     }
-    // Busca licença atual
+    // Busca licença atual — sempre, com ou sem pedidoId
     fetch('/api/minha-licenca', { credentials: 'include' })
       .then(r => r.json())
       .then(d => {
-        if (d.licenca) setLicenca(d.licenca)
-        else setEscolhendo(true) // sem licença ainda — mostra escolha
+        if (d.licenca) {
+          setLicenca(d.licenca)
+          if (!d.licenca.tipo) setEscolhendo(true)
+        } else {
+          setEscolhendo(true)
+        }
       })
       .catch(() => setEscolhendo(true))
   }, [pedidoId])

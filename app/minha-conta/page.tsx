@@ -127,7 +127,7 @@ export default function MinhaContaPage() {
             <div style={{ background: 'rgba(251,191,36,0.08)', border: '1px solid rgba(251,191,36,0.2)', borderRadius: '10px', padding: '16px', textAlign: 'center' }}>
               <p style={{ color: '#FBBF24', fontWeight: '700', marginBottom: '8px' }}>⚠️ Complete sua ativação</p>
               <p style={{ color: '#647489', fontSize: '13px', marginBottom: '16px' }}>Você ainda não escolheu seu método de acesso ao software.</p>
-              <Link href={`/obrigado`} style={{ padding: '10px 20px', background: '#3B82F6', color: '#fff', borderRadius: '8px', textDecoration: 'none', fontSize: '14px', fontWeight: '600' }}>Escolher método de acesso</Link>
+              <Link href="/obrigado" style={{ padding: '10px 20px', background: '#3B82F6', color: '#fff', borderRadius: '8px', textDecoration: 'none', fontSize: '14px', fontWeight: '600' }}>Escolher método de acesso</Link>
             </div>
           ) : (
             <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
