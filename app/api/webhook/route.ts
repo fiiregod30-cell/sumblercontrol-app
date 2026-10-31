@@ -3,7 +3,6 @@ import { supabaseAdmin } from '@/lib/supabase'
 import { sendDownloadEmail } from '@/lib/email'
 import { getPaymentStatus } from '@/lib/mercadopago'
 
-// Extrai IP real (Vercel usa x-forwarded-for)
 function getIP(req: NextRequest): string {
   return req.headers.get('x-forwarded-for')?.split(',')[0]?.trim()
       || req.headers.get('x-real-ip')
@@ -45,20 +44,7 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ received: true })
     }
 
-    // Atualiza pedido para pago
-    await supabaseAdmin
-      .from('pedidos')
-      .update({ status: 'pago', pago_em: new Date().toISOString() })
-      .eq('id', pedido.id)
-
-    // Incrementa cupom se existir
-    if (pedido.cupom_id) {
-      await supabaseAdmin.rpc('incrementar_uso_cupom', { cupom_id: pedido.cupom_id })
-    }
-
-    // ── FASE C: Criar ou renovar licença ─────────────────────
-    const expira_em = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString()
-
+    // Verifica se é renovação (usuário já tem licença)
     const { data: licencaExistente } = await supabaseAdmin
       .from('licencas')
       .select('id, expira_em, ativa')
@@ -67,8 +53,28 @@ export async function POST(req: NextRequest) {
       .limit(1)
       .single()
 
+    const ehRenovacao = !!licencaExistente
+
+    // Atualiza pedido para pago + marca se é renovação
+    await supabaseAdmin
+      .from('pedidos')
+      .update({
+        status: 'pago',
+        pago_em: new Date().toISOString(),
+        renovacao: ehRenovacao,
+      })
+      .eq('id', pedido.id)
+
+    // Incrementa cupom se existir
+    if (pedido.cupom_id) {
+      await supabaseAdmin.rpc('incrementar_uso_cupom', { cupom_id: pedido.cupom_id })
+    }
+
+    // ── Criar ou renovar licença ──────────────────────────────
+    const expira_em = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString()
+
     if (licencaExistente) {
-      // Renova: estende a partir de hoje ou do fim atual, o que for maior
+      // Renovação — Opção B: reseta tipo e key para o usuário escolher de novo
       const base = new Date(licencaExistente.expira_em) > new Date()
         ? new Date(licencaExistente.expira_em)
         : new Date()
@@ -76,10 +82,17 @@ export async function POST(req: NextRequest) {
 
       await supabaseAdmin
         .from('licencas')
-        .update({ expira_em: novaExpiracao, ativa: true })
+        .update({
+          expira_em: novaExpiracao,
+          ativa: true,
+          tipo: null,   // ← reseta para o usuário escolher de novo
+          key: null,    // ← limpa a key antiga
+          hwid: null,   // ← reseta HWID — novo período, novo PC se quiser
+          hwid_registrado_em: null,
+        })
         .eq('id', licencaExistente.id)
     } else {
-      // Cria nova licença com tipo = null (usuário escolhe em /obrigado)
+      // Primeira compra — cria licença nova com tipo = null
       await supabaseAdmin
         .from('licencas')
         .insert({
@@ -91,14 +104,14 @@ export async function POST(req: NextRequest) {
         })
     }
 
-    // Registra IP do webhook
+    // Registra IP
     await supabaseAdmin.from('ip_registros').insert({
       ip,
       usuario_id: pedido.usuario_id,
       tipo: 'pagamento_webhook',
     })
 
-    // Envia e-mail de confirmação com link de download
+    // Envia e-mail de confirmação
     const { data: user } = await supabaseAdmin
       .from('usuarios')
       .select('nome, email')
