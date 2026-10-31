@@ -194,6 +194,8 @@ function ObrigadoContent() {
             {/* Botão download só após escolher */}
             <a
               href={downloadLink || '#'}
+              target="_blank"
+              rel="noopener noreferrer"
               onClick={e => { if (!downloadLink) e.preventDefault() }}
               style={{ display: 'block', width: '100%', padding: '14px', background: downloadLink ? '#3B82F6' : '#243044', color: '#fff', borderRadius: '10px', textDecoration: 'none', fontWeight: '700', fontSize: '15px', textAlign: 'center', marginBottom: '10px', cursor: downloadLink ? 'pointer' : 'not-allowed' }}>
               {downloadLink ? '⬇️ Baixar SumblerControl' : '⏳ Carregando link...'}
@@ -216,6 +218,8 @@ function ObrigadoContent() {
             {/* Botão download só após escolher */}
             <a
               href={downloadLink || '#'}
+              target="_blank"
+              rel="noopener noreferrer"
               onClick={e => { if (!downloadLink) e.preventDefault() }}
               style={{ display: 'block', width: '100%', padding: '14px', background: downloadLink ? '#3B82F6' : '#243044', color: '#fff', borderRadius: '10px', textDecoration: 'none', fontWeight: '700', fontSize: '15px', textAlign: 'center', marginBottom: '10px', cursor: downloadLink ? 'pointer' : 'not-allowed' }}>
               {downloadLink ? '⬇️ Baixar SumblerControl' : '⏳ Carregando link...'}
