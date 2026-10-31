@@ -4,28 +4,30 @@ import { comparePassword, signToken } from '@/lib/auth'
 
 export async function POST(req: NextRequest) {
   try {
-    const { email, senha } = await req.json()
+    const { login, senha } = await req.json()
 
-    if (!email || !senha)
-      return NextResponse.json({ error: 'E-mail e senha são obrigatórios' }, { status: 400 })
+    if (!login || !senha)
+      return NextResponse.json({ error: 'Login e senha são obrigatórios' }, { status: 400 })
+
+    // Detecta se é e-mail ou username
+    const isEmail = login.includes('@')
 
     const { data: user } = await supabaseAdmin
       .from('usuarios')
       .select('id, nome, sobrenome, email, senha_hash, ativo, email_confirmado')
-      .eq('email', email.toLowerCase())
+      .eq(isEmail ? 'email' : 'username', login.toLowerCase())
       .single()
 
     if (!user)
-      return NextResponse.json({ error: 'E-mail ou senha incorretos' }, { status: 401 })
+      return NextResponse.json({ error: 'Usuário ou senha incorretos' }, { status: 401 })
 
     if (!user.ativo)
       return NextResponse.json({ error: 'Conta desativada. Entre em contato com o suporte.' }, { status: 403 })
 
     const senhaOk = await comparePassword(senha, user.senha_hash)
     if (!senhaOk)
-      return NextResponse.json({ error: 'E-mail ou senha incorretos' }, { status: 401 })
+      return NextResponse.json({ error: 'Usuário ou senha incorretos' }, { status: 401 })
 
-    // Bloqueia se e-mail não confirmado
     if (!user.email_confirmado) {
       return NextResponse.json({
         error: 'Confirme seu e-mail antes de entrar. Verifique sua caixa de entrada.',

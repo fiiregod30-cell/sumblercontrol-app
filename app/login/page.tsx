@@ -6,7 +6,7 @@ import Link from 'next/link'
 function LoginContent() {
   const router = useRouter()
   const params = useSearchParams()
-  const [form, setForm] = useState({ email: '', senha: '' })
+  const [form, setForm] = useState({ login: '', senha: '' })
   const [erro, setErro] = useState('')
   const [sucesso, setSucesso] = useState('')
   const [loading, setLoading] = useState(false)
@@ -39,11 +39,11 @@ function LoginContent() {
   }
 
   async function reenviarEmail() {
-    if (!form.email) { setErro('Digite seu e-mail primeiro'); return }
+    if (!form.login) { setErro('Digite seu e-mail ou usuário primeiro'); return }
     const res = await fetch('/api/auth/reenviar-confirmacao', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ email: form.email })
+      body: JSON.stringify({ email: form.login })
     })
     if (res.ok) { setSucesso('E-mail de confirmação reenviado! Verifique sua caixa de entrada.'); setErro(''); setNaoConfirmado(false) }
     else setErro('Não foi possível reenviar. Tente novamente.')
@@ -67,8 +67,14 @@ function LoginContent() {
             </div>
           )}
           <div>
-            <label style={{ display: 'block', fontSize: '13px', color: '#647489', marginBottom: '6px' }}>E-mail</label>
-            <input type="email" value={form.email} onChange={e => setForm(p => ({ ...p, email: e.target.value }))} placeholder="seu@email.com" required style={inputStyle} />
+            <label style={{ display: 'block', fontSize: '13px', color: '#647489', marginBottom: '6px' }}>E-mail ou nome de usuário</label>
+            <input
+              value={form.login}
+              onChange={e => setForm(p => ({ ...p, login: e.target.value }))}
+              placeholder="seu@email.com ou joaosilva"
+              required
+              style={inputStyle}
+            />
           </div>
           <div>
             <label style={{ display: 'block', fontSize: '13px', color: '#647489', marginBottom: '6px' }}>Senha</label>

@@ -1,12 +1,27 @@
 'use client'
 import { useSearchParams } from 'next/navigation'
 import Link from 'next/link'
-import { Suspense } from 'react'
+import { Suspense, useEffect, useState } from 'react'
 
 function ObrigadoContent() {
   const params = useSearchParams()
   const pedidoId = params.get('pedido') || ''
-  const downloadLink = process.env.NEXT_PUBLIC_DOWNLOAD_LINK
+  const [downloadLink, setDownloadLink] = useState('')
+
+  useEffect(() => {
+    fetch('/api/config-publica')
+      .then(r => r.json())
+      .then(d => { /* link vem do pedido, não da config */ })
+      .catch(() => {})
+
+    // Busca o link de download do pedido específico
+    if (pedidoId) {
+      fetch(`/api/pagamento/status?pedidoId=${pedidoId}`)
+        .then(r => r.json())
+        .then(d => { if (d.linkDownload) setDownloadLink(d.linkDownload) })
+        .catch(() => {})
+    }
+  }, [pedidoId])
 
   return (
     <div style={{ minHeight: '100vh', background: '#090F1A', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '24px' }}>
@@ -23,8 +38,11 @@ function ObrigadoContent() {
           </div>
         )}
 
-        <a href={downloadLink || '#'} style={{ display: 'block', width: '100%', padding: '16px', background: '#3B82F6', color: '#fff', borderRadius: '10px', textDecoration: 'none', fontWeight: '700', fontSize: '16px', marginBottom: '12px' }}>
-          ⬇️ Baixar SumblerControl
+        <a
+          href={downloadLink || '#'}
+          onClick={e => { if (!downloadLink) { e.preventDefault(); alert('Aguarde, carregando o link...') } }}
+          style={{ display: 'block', width: '100%', padding: '16px', background: downloadLink ? '#3B82F6' : '#243044', color: '#fff', borderRadius: '10px', textDecoration: 'none', fontWeight: '700', fontSize: '16px', marginBottom: '12px', cursor: downloadLink ? 'pointer' : 'not-allowed' }}>
+          {downloadLink ? '⬇️ Baixar SumblerControl' : '⏳ Carregando link...'}
         </a>
         <Link href="/minha-conta" style={{ display: 'block', padding: '14px', background: '#111826', border: '1px solid #1E2939', color: '#F1F5FA', borderRadius: '10px', textDecoration: 'none', fontSize: '14px' }}>
           Ir para minha conta

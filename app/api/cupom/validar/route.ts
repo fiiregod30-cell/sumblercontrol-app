@@ -26,8 +26,9 @@ export async function POST(req: NextRequest) {
     if (cupom.usos_maximos !== null && cupom.usos_atuais >= cupom.usos_maximos)
       return NextResponse.json({ error: 'Cupom atingiu o limite de usos' }, { status: 400 })
 
-    // Calcula desconto
-    const precoOriginal = 31.99
+    // Calcula desconto — busca preço atual do banco
+    const { data: cfg } = await supabaseAdmin.from('config_site').select('preco').eq('id', 1).single()
+    const precoOriginal = cfg?.preco ?? 31.99
     let desconto = 0
     let precoFinal = precoOriginal
 

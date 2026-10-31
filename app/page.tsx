@@ -1,6 +1,7 @@
 import Link from 'next/link'
 import Image from 'next/image'
 import { supabaseAdmin } from '@/lib/supabase'
+import NavBar from '@/components/NavBar'
 
 async function getConfig() {
   const { data } = await supabaseAdmin
@@ -23,26 +24,7 @@ export default async function Home() {
     <div style={{ background: '#090F1A', color: '#F1F5FA', fontFamily: 'Inter, sans-serif' }}>
 
       {/* NAV */}
-      <nav style={{ position: 'fixed', top: 0, left: 0, right: 0, zIndex: 100, background: 'rgba(9,15,26,0.9)', backdropFilter: 'blur(16px)', borderBottom: '1px solid #1E2939' }}>
-        <div style={{ maxWidth: '1160px', margin: '0 auto', padding: '0 24px', height: '64px', display: 'flex', alignItems: 'center', gap: '32px' }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '10px', fontWeight: '800', fontSize: '17px', flex: 1 }}>
-            <div style={{ width: '34px', height: '34px', background: 'rgba(59,130,246,0.12)', border: '1px solid rgba(59,130,246,0.3)', borderRadius: '8px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-              <svg width="20" height="20" viewBox="0 0 24 24" fill="none"><circle cx="12" cy="12" r="9" stroke="#3B82F6" strokeWidth="2"/><circle cx="12" cy="12" r="4" stroke="#3B82F6" strokeWidth="2"/></svg>
-            </div>
-            SumblerControl
-          </div>
-          <div style={{ display: 'flex', gap: '4px' }}>
-            {['#features', '#screenshots', '#preco', '#faq'].map((href, i) => (
-              <a key={href} href={href} style={{ padding: '6px 14px', borderRadius: '6px', textDecoration: 'none', color: '#647489', fontSize: '14px', fontWeight: '500' }}>
-                {['Recursos', 'Screenshots', 'Preço', 'FAQ'][i]}
-              </a>
-            ))}
-          </div>
-          <Link href="/registro" style={{ padding: '8px 18px', background: '#3B82F6', color: '#fff', borderRadius: '8px', textDecoration: 'none', fontSize: '14px', fontWeight: '600' }}>
-            Assinar Agora
-          </Link>
-        </div>
-      </nav>
+      <NavBar />
 
       {/* HERO */}
       <section style={{ minHeight: '100vh', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: '120px 24px 80px', position: 'relative', overflow: 'hidden' }}>

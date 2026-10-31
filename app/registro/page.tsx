@@ -3,7 +3,7 @@ import { useState } from 'react'
 import Link from 'next/link'
 
 export default function RegistroPage() {
-  const [form, setForm] = useState({ nome: '', sobrenome: '', telefone: '', email: '', senha: '', confirmarSenha: '' })
+  const [form, setForm] = useState({ nome: '', sobrenome: '', username: '', telefone: '', email: '', senha: '', confirmarSenha: '' })
   const [erro, setErro] = useState('')
   const [loading, setLoading] = useState(false)
   const [enviado, setEnviado] = useState(false)
@@ -18,7 +18,7 @@ export default function RegistroPage() {
       const res = await fetch('/api/auth/registro', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ nome: form.nome, sobrenome: form.sobrenome, telefone: form.telefone, email: form.email, senha: form.senha })
+        body: JSON.stringify({ nome: form.nome, sobrenome: form.sobrenome, username: form.username, telefone: form.telefone, email: form.email, senha: form.senha })
       })
       const data = await res.json()
       if (!res.ok && res.status !== 200) { setErro(data.error || 'Erro ao criar conta'); return }
@@ -85,6 +85,11 @@ export default function RegistroPage() {
               <label style={{ display: 'block', fontSize: '13px', color: '#647489', marginBottom: '6px' }}>Sobrenome</label>
               <input value={form.sobrenome} onChange={e => setForm(p => ({ ...p, sobrenome: e.target.value }))} placeholder="Silva" required style={inputStyle} />
             </div>
+          </div>
+          <div>
+            <label style={{ display: 'block', fontSize: '13px', color: '#647489', marginBottom: '6px' }}>Nome de usuário</label>
+            <input value={form.username} onChange={e => setForm(p => ({ ...p, username: e.target.value.replace(/[^a-zA-Z0-9_]/g, '').toLowerCase() }))} placeholder="joaosilva" required style={inputStyle} />
+            <p style={{ fontSize: '11px', color: '#647489', marginTop: '4px' }}>Letras, números e _ apenas. Usado para login.</p>
           </div>
           <div>
             <label style={{ display: 'block', fontSize: '13px', color: '#647489', marginBottom: '6px' }}>Telefone</label>
