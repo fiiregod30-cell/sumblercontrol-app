@@ -161,13 +161,15 @@ function ObrigadoContent() {
           </div>
         )}
 
-        {/* Botão download */}
-        <a
-          href={downloadLink || '#'}
-          onClick={e => { if (!downloadLink) { e.preventDefault(); alert('Aguarde, carregando o link...') } }}
-          style={{ display: 'block', width: '100%', padding: '14px', background: downloadLink ? '#3B82F6' : '#243044', color: '#fff', borderRadius: '10px', textDecoration: 'none', fontWeight: '700', fontSize: '15px', textAlign: 'center', marginBottom: '10px' }}>
-          {downloadLink ? '⬇️ Baixar SumblerControl' : '⏳ Carregando link...'}
-        </a>
+        {/* Botão download — só aparece APÓS escolher o método */}
+        {licencaDefinida && (
+          <a
+            href={downloadLink || '#'}
+            onClick={e => { if (!downloadLink) { e.preventDefault() } }}
+            style={{ display: 'block', width: '100%', padding: '14px', background: downloadLink ? '#3B82F6' : '#243044', color: '#fff', borderRadius: '10px', textDecoration: 'none', fontWeight: '700', fontSize: '15px', textAlign: 'center', marginBottom: '10px', cursor: downloadLink ? 'pointer' : 'not-allowed' }}>
+            {downloadLink ? '⬇️ Baixar SumblerControl' : '⏳ Carregando link...'}
+          </a>
+        )}
 
         <Link href="/minha-conta" style={{ display: 'block', padding: '12px', background: '#111826', border: '1px solid #1E2939', color: '#647489', borderRadius: '10px', textDecoration: 'none', fontSize: '14px', textAlign: 'center' }}>
           Ir para minha conta
