@@ -25,6 +25,15 @@ function ObrigadoContent() {
         .then(r => r.json())
         .then(d => { if (d.linkDownload) setDownloadLink(d.linkDownload) })
         .catch(() => {})
+    } else {
+      // Sem pedidoId — busca o link do último pedido pago do usuário
+      fetch('/api/minha-conta', { credentials: 'include' })
+        .then(r => r.json())
+        .then(d => {
+          const pago = (d.pedidos || []).find((p: { status: string; link_download: string }) => p.status === 'pago' && p.link_download)
+          if (pago) setDownloadLink(pago.link_download)
+        })
+        .catch(() => {})
     }
     // Busca licença atual — sempre, com ou sem pedidoId
     fetch('/api/minha-licenca', { credentials: 'include' })
