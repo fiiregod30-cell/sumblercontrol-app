@@ -6,11 +6,13 @@ import NavBar from '@/components/NavBar'
 async function getConfig() {
   const { data } = await supabaseAdmin
     .from('config_site')
-    .select('preco, produto_nome, imagem_url')
+    .select('preco, preco_semestral, preco_anual, produto_nome, imagem_url')
     .eq('id', 1)
     .single()
   return {
     preco: data?.preco ?? 31.99,
+    precoSemestral: data?.preco_semestral ?? 134.90,
+    precoAnual: data?.preco_anual ?? 289.90,
     nome: data?.produto_nome ?? 'SumblerControl',
     imagem: data?.imagem_url || '/assets/SumblerControl.png',
   }
@@ -19,6 +21,8 @@ async function getConfig() {
 export default async function Home() {
   const cfg = await getConfig()
   const precoStr = cfg.preco.toFixed(2).replace('.', ',')
+  const precoSemStr = cfg.precoSemestral.toFixed(2).replace('.', ',')
+  const precoAnualStr = cfg.precoAnual.toFixed(2).replace('.', ',')
 
   return (
     <div style={{ background: '#090F1A', color: '#F1F5FA', fontFamily: 'Inter, sans-serif' }}>
@@ -36,8 +40,8 @@ export default async function Home() {
             Windows 10 &amp; 11 — Compatível com todas as versões
           </div>
           <h1 style={{ fontSize: 'clamp(2.6rem, 6vw, 4.2rem)', fontWeight: '900', lineHeight: 1.1, letterSpacing: '-0.03em', marginBottom: '24px' }}>
-            Mais FPS.<br />
-            <span style={{ background: 'linear-gradient(135deg, #3B82F6, #818CF8)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent' }}>Menos Gargalo.</span>
+            Desempenho começa com<br />
+            <span style={{ background: 'linear-gradient(135deg, #3B82F6, #818CF8)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent' }}>as ferramentas certas.</span>
           </h1>
           <p style={{ fontSize: '18px', color: '#647489', lineHeight: 1.7, maxWidth: '620px', margin: '0 auto 36px' }}>
             SumblerControl analisa, otimiza e monitora seu PC em tempo real. Identifica o que está travando sua performance e entrega os FPS que seu hardware sempre teve capacidade de dar.
@@ -116,35 +120,97 @@ export default async function Home() {
       <section style={{ padding: '96px 24px', background: '#090F1A' }} id="preco">
         <div style={{ maxWidth: '1160px', margin: '0 auto' }}>
           <div style={{ textAlign: 'center', marginBottom: '48px' }}>
-            <div style={{ display: 'inline-block', padding: '4px 12px', background: 'rgba(59,130,246,0.1)', border: '1px solid rgba(59,130,246,0.2)', borderRadius: '999px', color: '#3B82F6', fontSize: '12px', fontWeight: '600', letterSpacing: '0.08em', textTransform: 'uppercase', marginBottom: '16px' }}>Plano</div>
-            <h2 style={{ fontSize: 'clamp(1.8rem, 4vw, 2.6rem)', fontWeight: '800', letterSpacing: '-0.02em', marginBottom: '12px' }}>Um plano. Acesso total.</h2>
-            <p style={{ fontSize: '17px', color: '#647489' }}>Sem funcionalidades bloqueadas. Sem versão lite.</p>
+            <div style={{ display: 'inline-block', padding: '4px 12px', background: 'rgba(59,130,246,0.1)', border: '1px solid rgba(59,130,246,0.2)', borderRadius: '999px', color: '#3B82F6', fontSize: '12px', fontWeight: '600', letterSpacing: '0.08em', textTransform: 'uppercase', marginBottom: '16px' }}>Planos</div>
+            <h2 style={{ fontSize: 'clamp(1.8rem, 4vw, 2.6rem)', fontWeight: '800', letterSpacing: '-0.02em', marginBottom: '12px' }}>Conheça os planos SumblerControl.</h2>
+            <p style={{ fontSize: '17px', color: '#647489', maxWidth: '600px', margin: '0 auto' }}>Escolha entre diferentes opções de acesso e aproveite os recursos disponíveis para cuidar do desempenho do seu computador.</p>
           </div>
-          <div style={{ display: 'flex', justifyContent: 'center' }}>
-            <div style={{ background: '#111826', border: '1px solid rgba(59,130,246,0.3)', borderRadius: '18px', padding: '40px', width: '100%', maxWidth: '460px', position: 'relative', boxShadow: '0 0 60px rgba(59,130,246,0.1)' }}>
-              <div style={{ position: 'absolute', top: '-13px', left: '50%', transform: 'translateX(-50%)', background: '#3B82F6', color: '#fff', fontSize: '12px', fontWeight: '700', padding: '4px 16px', borderRadius: '999px', whiteSpace: 'nowrap' }}>Acesso Completo</div>
-              <h3 style={{ fontSize: '18px', color: '#647489', marginBottom: '16px' }}>Plano Mensal</h3>
-              <div style={{ display: 'flex', alignItems: 'flex-start', gap: '4px', marginBottom: '28px' }}>
-                <span style={{ fontSize: '20px', fontWeight: '700', marginTop: '8px' }}>R$</span>
-                <span style={{ fontSize: '72px', fontWeight: '900', lineHeight: 1, letterSpacing: '-0.04em' }}>{precoStr.split(',')[0]}</span>
-                <div style={{ paddingBottom: '8px', display: 'flex', flexDirection: 'column', justifyContent: 'flex-end' }}>
-                  <span style={{ fontSize: '20px', fontWeight: '700' }}>,{precoStr.split(',')[1]}</span>
-                  <span style={{ fontSize: '14px', color: '#647489' }}>/mês</span>
+
+          {/* 3 cards de planos */}
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: '20px', alignItems: 'start' }}>
+
+            {/* Plano Mensal */}
+            <div style={{ background: '#111826', border: '1px solid rgba(59,130,246,0.2)', borderRadius: '18px', padding: '32px 28px', position: 'relative' }}>
+              <h3 style={{ fontSize: '18px', fontWeight: '700', marginBottom: '8px' }}>Plano Mensal</h3>
+              <p style={{ fontSize: '13px', color: '#647489', marginBottom: '16px' }}>
+                De <span style={{ textDecoration: 'line-through', color: '#EF4444' }}>R$ 99,90</span> por apenas
+              </p>
+              <div style={{ display: 'flex', alignItems: 'flex-start', gap: '4px', marginBottom: '24px' }}>
+                <span style={{ fontSize: '18px', fontWeight: '700', marginTop: '6px' }}>R$</span>
+                <span style={{ fontSize: '60px', fontWeight: '900', lineHeight: 1, letterSpacing: '-0.04em' }}>{precoStr.split(',')[0]}</span>
+                <div style={{ paddingBottom: '6px', display: 'flex', flexDirection: 'column', justifyContent: 'flex-end' }}>
+                  <span style={{ fontSize: '18px', fontWeight: '700' }}>,{precoStr.split(',')[1]}</span>
+                  <span style={{ fontSize: '13px', color: '#647489' }}>/mês</span>
                 </div>
               </div>
-              <ul style={{ listStyle: 'none', marginBottom: '28px', display: 'flex', flexDirection: 'column', gap: '10px' }}>
-                {['Análise de gargalo em tempo real', '22+ otimizações de gaming', 'Redução de input lag (Timer 0.5ms)', 'Overlay de FPS e frametime', 'Benchmark completo (CPU, RAM, Disco)', 'Gerenciador de serviços (65+)', 'Compatível com Windows 10 e 11', 'Atualizações incluídas'].map(item => (
-                  <li key={item} style={{ display: 'flex', alignItems: 'center', gap: '10px', fontSize: '14px' }}>
-                    <span style={{ color: '#22C55E', fontWeight: '700', flexShrink: 0 }}>✓</span>
-                    {item}
+              <ul style={{ listStyle: 'none', marginBottom: '24px', display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                {['Análise de gargalo em tempo real', '22+ otimizações de gaming', 'Redução de input lag', 'Overlay de FPS e frametime', 'Benchmark completo', 'Gerenciador de serviços (65+)', 'Windows 10 e 11'].map(item => (
+                  <li key={item} style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '13px' }}>
+                    <span style={{ color: '#22C55E', fontWeight: '700', flexShrink: 0 }}>✓</span>{item}
                   </li>
                 ))}
               </ul>
-              <Link href="/checkout" style={{ display: 'block', width: '100%', padding: '14px', background: '#3B82F6', color: '#fff', borderRadius: '10px', textDecoration: 'none', fontWeight: '700', fontSize: '15px', textAlign: 'center' }}>
+              <Link href="/checkout?plano=mensal" style={{ display: 'block', width: '100%', padding: '13px', background: '#3B82F6', color: '#fff', borderRadius: '10px', textDecoration: 'none', fontWeight: '700', fontSize: '14px', textAlign: 'center' }}>
                 ⚡ Assinar Agora
               </Link>
-              <p style={{ textAlign: 'center', fontSize: '13px', color: '#647489', marginTop: '12px' }}>Cancele a qualquer momento · Sem fidelidade</p>
+              <p style={{ textAlign: 'center', fontSize: '12px', color: '#647489', marginTop: '10px' }}>Cancele a qualquer momento</p>
             </div>
+
+            {/* Plano Semestral — Mais Popular */}
+            <div style={{ background: '#111826', border: '2px solid #3B82F6', borderRadius: '18px', padding: '32px 28px', position: 'relative', boxShadow: '0 0 40px rgba(59,130,246,0.15)' }}>
+              <div style={{ position: 'absolute', top: '-13px', left: '50%', transform: 'translateX(-50%)', background: '#3B82F6', color: '#fff', fontSize: '11px', fontWeight: '700', padding: '4px 14px', borderRadius: '999px', whiteSpace: 'nowrap' }}>⭐ Mais Popular</div>
+              <h3 style={{ fontSize: '18px', fontWeight: '700', marginBottom: '8px' }}>Plano Semestral</h3>
+              <p style={{ fontSize: '13px', color: '#647489', marginBottom: '16px' }}>
+                De <span style={{ textDecoration: 'line-through', color: '#EF4444' }}>R$ 197,90</span> por apenas
+              </p>
+              <div style={{ display: 'flex', alignItems: 'flex-start', gap: '4px', marginBottom: '24px' }}>
+                <span style={{ fontSize: '18px', fontWeight: '700', marginTop: '6px' }}>R$</span>
+                <span style={{ fontSize: '60px', fontWeight: '900', lineHeight: 1, letterSpacing: '-0.04em' }}>{precoSemStr.split(',')[0]}</span>
+                <div style={{ paddingBottom: '6px', display: 'flex', flexDirection: 'column', justifyContent: 'flex-end' }}>
+                  <span style={{ fontSize: '18px', fontWeight: '700' }}>,{precoSemStr.split(',')[1]}</span>
+                  <span style={{ fontSize: '13px', color: '#647489' }}>/semestre</span>
+                </div>
+              </div>
+              <ul style={{ listStyle: 'none', marginBottom: '24px', display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                {['Análise de gargalo em tempo real', '22+ otimizações de gaming', 'Redução de input lag', 'Overlay de FPS e frametime', 'Benchmark completo', 'Gerenciador de serviços (65+)', 'Windows 10 e 11', '6 meses de acesso'].map(item => (
+                  <li key={item} style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '13px' }}>
+                    <span style={{ color: '#22C55E', fontWeight: '700', flexShrink: 0 }}>✓</span>{item}
+                  </li>
+                ))}
+              </ul>
+              <Link href="/checkout?plano=semestral" style={{ display: 'block', width: '100%', padding: '13px', background: '#3B82F6', color: '#fff', borderRadius: '10px', textDecoration: 'none', fontWeight: '700', fontSize: '14px', textAlign: 'center' }}>
+                ⚡ Assinar Agora
+              </Link>
+              <p style={{ textAlign: 'center', fontSize: '12px', color: '#647489', marginTop: '10px' }}>Cancele a qualquer momento</p>
+            </div>
+
+            {/* Plano Anual — Melhor Valor */}
+            <div style={{ background: '#111826', border: '1px solid rgba(34,197,94,0.3)', borderRadius: '18px', padding: '32px 28px', position: 'relative' }}>
+              <div style={{ position: 'absolute', top: '-13px', left: '50%', transform: 'translateX(-50%)', background: '#22C55E', color: '#000', fontSize: '11px', fontWeight: '700', padding: '4px 14px', borderRadius: '999px', whiteSpace: 'nowrap' }}>💰 Melhor Valor</div>
+              <h3 style={{ fontSize: '18px', fontWeight: '700', marginBottom: '8px' }}>Plano Anual</h3>
+              <p style={{ fontSize: '13px', color: '#647489', marginBottom: '16px' }}>
+                De <span style={{ textDecoration: 'line-through', color: '#EF4444' }}>R$ 349,90</span> por apenas
+              </p>
+              <div style={{ display: 'flex', alignItems: 'flex-start', gap: '4px', marginBottom: '24px' }}>
+                <span style={{ fontSize: '18px', fontWeight: '700', marginTop: '6px' }}>R$</span>
+                <span style={{ fontSize: '60px', fontWeight: '900', lineHeight: 1, letterSpacing: '-0.04em' }}>{precoAnualStr.split(',')[0]}</span>
+                <div style={{ paddingBottom: '6px', display: 'flex', flexDirection: 'column', justifyContent: 'flex-end' }}>
+                  <span style={{ fontSize: '18px', fontWeight: '700' }}>,{precoAnualStr.split(',')[1]}</span>
+                  <span style={{ fontSize: '13px', color: '#647489' }}>/ano</span>
+                </div>
+              </div>
+              <ul style={{ listStyle: 'none', marginBottom: '24px', display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                {['Análise de gargalo em tempo real', '22+ otimizações de gaming', 'Redução de input lag', 'Overlay de FPS e frametime', 'Benchmark completo', 'Gerenciador de serviços (65+)', 'Windows 10 e 11', '12 meses de acesso'].map(item => (
+                  <li key={item} style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '13px' }}>
+                    <span style={{ color: '#22C55E', fontWeight: '700', flexShrink: 0 }}>✓</span>{item}
+                  </li>
+                ))}
+              </ul>
+              <Link href="/checkout?plano=anual" style={{ display: 'block', width: '100%', padding: '13px', background: '#22C55E', color: '#000', borderRadius: '10px', textDecoration: 'none', fontWeight: '700', fontSize: '14px', textAlign: 'center' }}>
+                ⚡ Assinar Agora
+              </Link>
+              <p style={{ textAlign: 'center', fontSize: '12px', color: '#647489', marginTop: '10px' }}>Cancele a qualquer momento</p>
+            </div>
+
           </div>
         </div>
       </section>

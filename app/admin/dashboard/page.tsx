@@ -7,7 +7,7 @@ interface Cupom {
   usos_maximos: number | null; usos_atuais: number; expira_em: string | null; ativo: boolean
 }
 interface Stats { usuarios: number; vendas: number; receita: number }
-interface Config { preco: number; imagem_url: string; link_download: string; produto_nome: string }
+interface Config { preco: number; preco_semestral: number; preco_anual: number; imagem_url: string; link_download: string; produto_nome: string }
 interface Licenca {
   id: string; tipo: string | null; key: string | null; ativa: boolean
   expira_em: string; hwid: string | null; statusHwid: string; ultimo_acesso: string | null
@@ -32,7 +32,7 @@ export default function AdminDashboard() {
   const [pedidos, setPedidos] = useState<{id:string;valor_original:number;valor_desconto:number;valor_final:number;status:string;criado_em:string;usuario_id:string;cupons:{codigo:string}|null}[]>([])
   const [novoCupom, setNovoCupom] = useState({ codigo: '', tipo: 'porcentagem', valor: '', usos_maximos: '', expira_em: '' })
   const [cupomMsg, setCupomMsg] = useState('')
-  const [config, setConfig] = useState<Config>({ preco: 31.99, imagem_url: '', link_download: '', produto_nome: 'SumblerControl' })
+  const [config, setConfig] = useState<Config>({ preco: 31.99, preco_semestral: 134.90, preco_anual: 289.90, imagem_url: '', link_download: '', produto_nome: 'SumblerControl' })
   const [configMsg, setConfigMsg] = useState('')
   const [configLoading, setConfigLoading] = useState(false)
 
@@ -361,16 +361,36 @@ export default function AdminDashboard() {
                 </div>
 
                 <div>
-                  <label style={labelStyle}>Preço mensal (R$)</label>
+                  <label style={labelStyle}>Preço Mensal (R$)</label>
                   <input
-                    type="number"
-                    step="0.01"
-                    min="0.01"
+                    type="number" step="0.01" min="0.01"
                     value={config.preco}
                     onChange={e => setConfig(p => ({ ...p, preco: parseFloat(e.target.value) }))}
                     style={inputStyle}
                   />
                   <p style={{ fontSize: '12px', color: '#647489', marginTop: '4px' }}>Valor atual: R$ {config.preco.toFixed(2)}</p>
+                </div>
+
+                <div>
+                  <label style={labelStyle}>Preço Semestral (R$)</label>
+                  <input
+                    type="number" step="0.01" min="0.01"
+                    value={config.preco_semestral}
+                    onChange={e => setConfig(p => ({ ...p, preco_semestral: parseFloat(e.target.value) }))}
+                    style={inputStyle}
+                  />
+                  <p style={{ fontSize: '12px', color: '#647489', marginTop: '4px' }}>De R$ 197,90 → R$ {config.preco_semestral?.toFixed(2)}</p>
+                </div>
+
+                <div>
+                  <label style={labelStyle}>Preço Anual (R$)</label>
+                  <input
+                    type="number" step="0.01" min="0.01"
+                    value={config.preco_anual}
+                    onChange={e => setConfig(p => ({ ...p, preco_anual: parseFloat(e.target.value) }))}
+                    style={inputStyle}
+                  />
+                  <p style={{ fontSize: '12px', color: '#647489', marginTop: '4px' }}>De R$ 349,90 → R$ {config.preco_anual?.toFixed(2)}</p>
                 </div>
 
                 <div>

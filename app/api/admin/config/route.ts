@@ -34,6 +34,8 @@ export async function PATCH(req: NextRequest) {
   const updates: Record<string, string | number> = {}
 
   if (body.preco !== undefined) updates.preco = parseFloat(body.preco)
+  if (body.preco_semestral !== undefined) updates.preco_semestral = parseFloat(body.preco_semestral)
+  if (body.preco_anual !== undefined) updates.preco_anual = parseFloat(body.preco_anual)
   if (body.imagem_url !== undefined) updates.imagem_url = body.imagem_url
   if (body.link_download !== undefined) updates.link_download = body.link_download
   if (body.produto_nome !== undefined) updates.produto_nome = body.produto_nome

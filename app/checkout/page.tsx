@@ -20,11 +20,19 @@ export default function CheckoutPage() {
   const [timer, setTimer] = useState(0)
   const [statusPago, setStatusPago] = useState(false)
 
-  // Busca o preço atual do banco
+  // Busca o preço atual do banco — considera o plano da URL
   useEffect(() => {
+    const searchParams = new URLSearchParams(window.location.search)
+    const plano = searchParams.get('plano') || 'mensal'
     fetch('/api/config-publica')
       .then(r => r.json())
-      .then(d => { setPrecoBase(d.preco); setValorFinal(d.preco) })
+      .then(d => {
+        let preco = d.preco
+        if (plano === 'semestral') preco = d.precoSemestral
+        if (plano === 'anual') preco = d.precoAnual
+        setPrecoBase(preco)
+        setValorFinal(preco)
+      })
       .catch(() => { setPrecoBase(31.99); setValorFinal(31.99) })
   }, [])
 
