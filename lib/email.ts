@@ -84,3 +84,51 @@ export async function sendDownloadEmailManual(email: string, name: string) {
     `
   })
 }
+
+// ── E-mail com a key após ativação ───────────────────────────
+export async function sendLicensaEmail(email: string, name: string, key: string) {
+  await transporter.sendMail({
+    from: FROM,
+    to: email,
+    subject: `🔑 Sua licença SumblerControl — ${key}`,
+    html: `
+      <div style="background:#090F1A;color:#F1F5FA;font-family:Inter,sans-serif;padding:40px;max-width:600px;margin:0 auto;border-radius:12px;">
+        <h1 style="color:#3B82F6;font-size:22px;margin-bottom:8px;">Sua licença foi ativada!</h1>
+        <p style="color:#647489;margin-bottom:24px;">Olá, ${name}! Guarde este e-mail — você precisará da key para ativar o software.</p>
+        <div style="background:#111826;border:1px solid #1E2939;border-radius:10px;padding:20px;margin-bottom:24px;text-align:center;">
+          <p style="color:#647489;font-size:12px;margin-bottom:8px;">Sua Key de Licença</p>
+          <p style="font-family:monospace;font-size:20px;font-weight:800;color:#3B82F6;letter-spacing:0.1em;">${key}</p>
+        </div>
+        <p style="color:#647489;font-size:14px;line-height:1.7;margin-bottom:8px;"><strong style="color:#F1F5FA;">Como usar:</strong></p>
+        <ol style="color:#647489;font-size:14px;line-height:2;padding-left:20px;">
+          <li>Abra o <strong style="color:#F1F5FA;">SumblerControl.exe</strong></li>
+          <li>Selecione <strong style="color:#F1F5FA;">"Key"</strong></li>
+          <li>Digite a key acima e clique <strong style="color:#F1F5FA;">Entrar</strong></li>
+        </ol>
+        <div style="background:rgba(251,191,36,0.1);border:1px solid rgba(251,191,36,0.3);border-radius:8px;padding:14px;margin-top:24px;">
+          <p style="color:#FBBF24;font-size:13px;">⚠️ Para trocar de PC, entre em contato com o suporte. A licença só funciona no primeiro PC onde foi ativada.</p>
+        </div>
+        <hr style="border:none;border-top:1px solid #1E2939;margin:24px 0;">
+        <p style="color:#647489;font-size:12px;">SumblerControl — Mais FPS. Menos Gargalo.</p>
+      </div>
+    `
+  })
+}
+
+// ── E-mail de reset de HWID pelo admin ───────────────────────
+export async function sendHwidResetEmail(email: string, name: string) {
+  await transporter.sendMail({
+    from: FROM,
+    to: email,
+    subject: '🔄 HWID resetado — SumblerControl',
+    html: `
+      <div style="background:#090F1A;color:#F1F5FA;font-family:Inter,sans-serif;padding:40px;max-width:600px;margin:0 auto;border-radius:12px;">
+        <h1 style="color:#3B82F6;font-size:22px;margin-bottom:8px;">HWID Resetado</h1>
+        <p style="color:#647489;margin-bottom:24px;">Olá, ${name}! Seu HWID foi resetado pelo suporte.</p>
+        <p style="color:#647489;font-size:14px;line-height:1.7;">Você pode agora ativar sua licença em um novo PC. Basta abrir o SumblerControl.exe e fazer login normalmente — o novo PC será registrado automaticamente.</p>
+        <hr style="border:none;border-top:1px solid #1E2939;margin:24px 0;">
+        <p style="color:#647489;font-size:12px;">SumblerControl — Mais FPS. Menos Gargalo.</p>
+      </div>
+    `
+  })
+}
