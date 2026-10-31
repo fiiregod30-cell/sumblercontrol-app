@@ -8,11 +8,25 @@ interface Cupom {
 }
 interface Stats { usuarios: number; vendas: number; receita: number }
 interface Config { preco: number; imagem_url: string; link_download: string; produto_nome: string }
+interface Licenca {
+  id: string; tipo: string | null; key: string | null; ativa: boolean
+  expira_em: string; hwid: string | null; statusHwid: string; ultimo_acesso: string | null
+  usuarios: { nome: string; sobrenome: string; email: string }
+}
+interface IpSuspeito { ip: string; totalUsuarios: number }
+interface IpBloqueado { id: string; ip: string; motivo: string; criado_em: string }
 
 export default function AdminDashboard() {
   const router = useRouter()
-  const [aba, setAba] = useState<'dashboard'|'cupons'|'usuarios'|'vendas'|'configuracoes'>('dashboard')
+  const [aba, setAba] = useState<'dashboard'|'cupons'|'usuarios'|'vendas'|'configuracoes'|'licencas'|'ips'>('dashboard')
   const [stats, setStats] = useState<Stats>({ usuarios: 0, vendas: 0, receita: 0 })
+  const [licencas, setLicencas] = useState<Licenca[]>([])
+  const [ipSuspeitos, setIpSuspeitos] = useState<IpSuspeito[]>([])
+  const [ipBloqueados, setIpBloqueados] = useState<IpBloqueado[]>([])
+  const [novaLicencaUsuario, setNovaLicencaUsuario] = useState('')
+  const [novaLicencaTipo, setNovaLicencaTipo] = useState('key')
+  const [novaLicencaDias, setNovaLicencaDias] = useState('30')
+  const [licencaMsg, setLicencaMsg] = useState('')
   const [cupons, setCupons] = useState<Cupom[]>([])
   const [usuarios, setUsuarios] = useState<{id:string;nome:string;sobrenome:string;email:string;telefone:string;criado_em:string}[]>([])
   const [pedidos, setPedidos] = useState<{id:string;valor_final:number;status:string;criado_em:string;usuario_id:string}[]>([])
@@ -31,6 +45,20 @@ export default function AdminDashboard() {
         if (res.status === 401) { router.push('/admin'); return }
         const data = await res.json()
         setConfig(data)
+        return
+      }
+      if (aba === 'licencas') {
+        const res = await fetch('/api/admin/licencas', { credentials: 'include' })
+        if (res.status === 401) { router.push('/admin'); return }
+        setLicencas(await res.json())
+        return
+      }
+      if (aba === 'ips') {
+        const res = await fetch('/api/admin/ips', { credentials: 'include' })
+        if (res.status === 401) { router.push('/admin'); return }
+        const data = await res.json()
+        setIpSuspeitos(data.suspeitos || [])
+        setIpBloqueados(data.bloqueados || [])
         return
       }
       const res = await fetch('/api/admin/dados?tipo=' + aba, { credentials: 'include' })
@@ -64,6 +92,44 @@ export default function AdminDashboard() {
     alert('E-mail reenviado!')
   }
 
+  async function resetarHwid(licencaId: string) {
+    if (!confirm('Resetar HWID? O usuário poderá ativar em um novo PC.')) return
+    await fetch('/api/admin/licencas/resetar-hwid', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ licenca_id: licencaId }) })
+    carregarDados()
+  }
+
+  async function toggleLicenca(licencaId: string, ativa: boolean) {
+    await fetch('/api/admin/licencas/toggle', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ licenca_id: licencaId, ativa: !ativa }) })
+    carregarDados()
+  }
+
+  async function renovarLicenca(licencaId: string) {
+    await fetch('/api/admin/licencas/renovar', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ licenca_id: licencaId, dias: 30 }) })
+    carregarDados()
+  }
+
+  async function criarLicenca(e: React.FormEvent) {
+    e.preventDefault(); setLicencaMsg('')
+    const res = await fetch('/api/admin/licencas', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ usuario_id: novaLicencaUsuario, tipo: novaLicencaTipo, dias: parseInt(novaLicencaDias) })
+    })
+    const data = await res.json()
+    if (res.ok) { setLicencaMsg(`✓ Licença criada! Key: ${data.key || '—'}`); carregarDados() }
+    else setLicencaMsg('✗ ' + data.error)
+  }
+
+  async function banirIp(ip: string) {
+    if (!confirm(`Banir IP ${ip}? Todas as licenças vinculadas serão desativadas.`)) return
+    await fetch('/api/admin/ips/banir', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ ip, motivo: 'Múltiplos usuários' }) })
+    carregarDados()
+  }
+
+  async function desbloquearIp(ip: string) {
+    await fetch('/api/admin/ips/desbloquear', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ ip }) })
+    carregarDados()
+  }
+
   async function salvarConfig(e: React.FormEvent) {
     e.preventDefault(); setConfigMsg(''); setConfigLoading(true)
     const res = await fetch('/api/admin/config', {
@@ -85,6 +151,8 @@ export default function AdminDashboard() {
     { id: 'cupons', label: '🏷️ Cupons' },
     { id: 'usuarios', label: '👥 Usuários' },
     { id: 'vendas', label: '💰 Vendas' },
+    { id: 'licencas', label: '🔑 Licenças' },
+    { id: 'ips', label: '🌐 IPs' },
     { id: 'configuracoes', label: '⚙️ Configurações' },
   ]
 
@@ -310,6 +378,160 @@ export default function AdminDashboard() {
             </div>
           )}
 
+          {/* Licenças */}
+          {aba === 'licencas' && (
+            <div>
+              <h2 style={{ fontSize: '20px', fontWeight: '800', marginBottom: '24px' }}>🔑 Licenças</h2>
+
+              {/* Criar licença manual */}
+              <div style={{ background: '#111826', border: '1px solid #1E2939', borderRadius: '12px', padding: '20px', marginBottom: '20px' }}>
+                <h3 style={{ fontSize: '15px', fontWeight: '700', marginBottom: '14px' }}>+ Nova Licença Manual</h3>
+                <form onSubmit={criarLicenca} style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr) auto', gap: '10px', alignItems: 'flex-end' }}>
+                  <div>
+                    <label style={labelStyle}>ID do Usuário</label>
+                    <input value={novaLicencaUsuario} onChange={e => setNovaLicencaUsuario(e.target.value)} placeholder="UUID do usuário" required style={inputStyle} />
+                  </div>
+                  <div>
+                    <label style={labelStyle}>Tipo</label>
+                    <select value={novaLicencaTipo} onChange={e => setNovaLicencaTipo(e.target.value)} style={inputStyle}>
+                      <option value="key">Key</option>
+                      <option value="usuario_senha">Usuário e Senha</option>
+                    </select>
+                  </div>
+                  <div>
+                    <label style={labelStyle}>Dias</label>
+                    <input type="number" value={novaLicencaDias} onChange={e => setNovaLicencaDias(e.target.value)} min="1" style={inputStyle} />
+                  </div>
+                  <button type="submit" style={{ padding: '9px 16px', background: '#3B82F6', color: '#fff', border: 'none', borderRadius: '8px', fontSize: '13px', fontWeight: '600', cursor: 'pointer', whiteSpace: 'nowrap' }}>
+                    Criar
+                  </button>
+                </form>
+                {licencaMsg && <p style={{ marginTop: '10px', fontSize: '13px', color: licencaMsg.startsWith('✓') ? '#22C55E' : '#EF4444' }}>{licencaMsg}</p>}
+              </div>
+
+              {/* Lista de licenças */}
+              <div style={{ background: '#111826', border: '1px solid #1E2939', borderRadius: '12px', overflow: 'auto' }}>
+                <table style={{ width: '100%', borderCollapse: 'collapse', minWidth: '900px' }}>
+                  <thead><tr style={{ background: '#151D2C' }}>
+                    {['Usuário', 'Tipo', 'Key', 'Expira', 'HWID', 'Status', 'Ações'].map(h => (
+                      <th key={h} style={{ padding: '10px 14px', textAlign: 'left', fontSize: '11px', color: '#647489', fontWeight: '600' }}>{h}</th>
+                    ))}
+                  </tr></thead>
+                  <tbody>
+                    {licencas.map(l => {
+                      const u = l.usuarios
+                      const expirou = new Date(l.expira_em) < new Date()
+                      return (
+                        <tr key={l.id} style={{ borderTop: '1px solid #1E2939' }}>
+                          <td style={{ padding: '10px 14px' }}>
+                            <p style={{ fontSize: '13px', fontWeight: '600' }}>{u?.nome} {u?.sobrenome}</p>
+                            <p style={{ fontSize: '11px', color: '#647489' }}>{u?.email}</p>
+                          </td>
+                          <td style={{ padding: '10px 14px', fontSize: '12px', color: '#647489' }}>
+                            {!l.tipo ? '⏳ Pendente' : l.tipo === 'key' ? '🔑 Key' : '👤 U/S'}
+                          </td>
+                          <td style={{ padding: '10px 14px', fontFamily: 'monospace', fontSize: '11px', color: '#3B82F6' }}>
+                            {l.key || '—'}
+                          </td>
+                          <td style={{ padding: '10px 14px', fontSize: '12px', color: expirou ? '#EF4444' : '#647489' }}>
+                            {new Date(l.expira_em).toLocaleDateString('pt-BR')}
+                            {expirou && <span style={{ marginLeft: '4px' }}>❌</span>}
+                          </td>
+                          <td style={{ padding: '10px 14px' }}>
+                            <span style={{ fontSize: '11px', padding: '2px 6px', borderRadius: '999px', background: l.statusHwid === 'ativado' ? 'rgba(34,197,94,0.1)' : 'rgba(251,191,36,0.1)', color: l.statusHwid === 'ativado' ? '#22C55E' : '#FBBF24' }}>
+                              {l.statusHwid === 'ativado' ? '✅ Ativado' : '⏳ Pendente'}
+                            </span>
+                          </td>
+                          <td style={{ padding: '10px 14px' }}>
+                            <span style={{ fontSize: '11px', padding: '2px 6px', borderRadius: '999px', background: l.ativa ? 'rgba(34,197,94,0.1)' : 'rgba(239,68,68,0.1)', color: l.ativa ? '#22C55E' : '#EF4444' }}>
+                              {l.ativa ? 'Ativa' : 'Inativa'}
+                            </span>
+                          </td>
+                          <td style={{ padding: '10px 14px' }}>
+                            <div style={{ display: 'flex', gap: '4px', flexWrap: 'wrap' }}>
+                              {l.statusHwid === 'ativado' && (
+                                <button onClick={() => resetarHwid(l.id)} style={btnAcaoStyle}>Reset HWID</button>
+                              )}
+                              <button onClick={() => toggleLicenca(l.id, l.ativa)} style={{ ...btnAcaoStyle, color: l.ativa ? '#EF4444' : '#22C55E' }}>
+                                {l.ativa ? 'Desativar' : 'Ativar'}
+                              </button>
+                              <button onClick={() => renovarLicenca(l.id)} style={btnAcaoStyle}>+30d</button>
+                            </div>
+                          </td>
+                        </tr>
+                      )
+                    })}
+                    {licencas.length === 0 && (
+                      <tr><td colSpan={7} style={{ padding: '24px', textAlign: 'center', color: '#647489', fontSize: '13px' }}>Nenhuma licença encontrada.</td></tr>
+                    )}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          )}
+
+          {/* IPs */}
+          {aba === 'ips' && (
+            <div>
+              <h2 style={{ fontSize: '20px', fontWeight: '800', marginBottom: '24px' }}>🌐 Monitoramento de IPs</h2>
+
+              {/* Suspeitos */}
+              <div style={{ background: '#111826', border: '1px solid #1E2939', borderRadius: '12px', padding: '20px', marginBottom: '20px' }}>
+                <h3 style={{ fontSize: '15px', fontWeight: '700', marginBottom: '14px', color: '#FBBF24' }}>⚠️ IPs Suspeitos (múltiplos usuários)</h3>
+                {ipSuspeitos.length === 0 ? (
+                  <p style={{ color: '#647489', fontSize: '13px' }}>Nenhum IP suspeito detectado.</p>
+                ) : (
+                  <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+                    <thead><tr style={{ background: '#151D2C' }}>
+                      {['IP', 'Usuários distintos', 'Ações'].map(h => (
+                        <th key={h} style={{ padding: '10px 14px', textAlign: 'left', fontSize: '11px', color: '#647489', fontWeight: '600' }}>{h}</th>
+                      ))}
+                    </tr></thead>
+                    <tbody>
+                      {ipSuspeitos.map(s => (
+                        <tr key={s.ip} style={{ borderTop: '1px solid #1E2939' }}>
+                          <td style={{ padding: '10px 14px', fontFamily: 'monospace', fontSize: '13px' }}>{s.ip}</td>
+                          <td style={{ padding: '10px 14px', fontSize: '13px', color: '#FBBF24' }}>{s.totalUsuarios} usuários</td>
+                          <td style={{ padding: '10px 14px' }}>
+                            <button onClick={() => banirIp(s.ip)} style={{ ...btnAcaoStyle, color: '#EF4444' }}>🚫 Banir IP</button>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                )}
+              </div>
+
+              {/* Bloqueados */}
+              <div style={{ background: '#111826', border: '1px solid #1E2939', borderRadius: '12px', padding: '20px' }}>
+                <h3 style={{ fontSize: '15px', fontWeight: '700', marginBottom: '14px', color: '#EF4444' }}>🚫 IPs Bloqueados</h3>
+                {ipBloqueados.length === 0 ? (
+                  <p style={{ color: '#647489', fontSize: '13px' }}>Nenhum IP bloqueado.</p>
+                ) : (
+                  <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+                    <thead><tr style={{ background: '#151D2C' }}>
+                      {['IP', 'Motivo', 'Bloqueado em', 'Ações'].map(h => (
+                        <th key={h} style={{ padding: '10px 14px', textAlign: 'left', fontSize: '11px', color: '#647489', fontWeight: '600' }}>{h}</th>
+                      ))}
+                    </tr></thead>
+                    <tbody>
+                      {ipBloqueados.map(b => (
+                        <tr key={b.id} style={{ borderTop: '1px solid #1E2939' }}>
+                          <td style={{ padding: '10px 14px', fontFamily: 'monospace', fontSize: '13px' }}>{b.ip}</td>
+                          <td style={{ padding: '10px 14px', fontSize: '13px', color: '#647489' }}>{b.motivo}</td>
+                          <td style={{ padding: '10px 14px', fontSize: '13px', color: '#647489' }}>{new Date(b.criado_em).toLocaleDateString('pt-BR')}</td>
+                          <td style={{ padding: '10px 14px' }}>
+                            <button onClick={() => desbloquearIp(b.ip)} style={{ ...btnAcaoStyle, color: '#22C55E' }}>✅ Desbloquear</button>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                )}
+              </div>
+            </div>
+          )}
+
         </div>
       </div>
     </div>
@@ -321,3 +543,7 @@ const inputStyle: React.CSSProperties = {
   borderRadius: '8px', color: '#F1F5FA', fontSize: '13px', outline: 'none',
 }
 const labelStyle: React.CSSProperties = { display: 'block', fontSize: '12px', color: '#647489', marginBottom: '5px' }
+const btnAcaoStyle: React.CSSProperties = {
+  padding: '4px 10px', background: '#151D2C', border: '1px solid #243044',
+  borderRadius: '6px', color: '#F1F5FA', fontSize: '11px', cursor: 'pointer', whiteSpace: 'nowrap'
+}
