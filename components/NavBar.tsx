@@ -136,7 +136,7 @@ export default function NavBar() {
                 Entrar
               </Link>
             )}
-            <Link href="/registro" style={{ padding: '8px 18px', background: '#3B82F6', color: '#fff', borderRadius: '8px', textDecoration: 'none', fontSize: '14px', fontWeight: '600' }}>
+            <Link href="/checkout" style={{ padding: '8px 18px', background: '#3B82F6', color: '#fff', borderRadius: '8px', textDecoration: 'none', fontSize: '14px', fontWeight: '600' }}>
               Assinar Agora
             </Link>
           </div>

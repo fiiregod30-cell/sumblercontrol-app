@@ -43,7 +43,7 @@ export default async function Home() {
             SumblerControl analisa, otimiza e monitora seu PC em tempo real. Identifica o que está travando sua performance e entrega os FPS que seu hardware sempre teve capacidade de dar.
           </p>
           <div style={{ display: 'flex', gap: '14px', justifyContent: 'center', flexWrap: 'wrap', marginBottom: '56px' }}>
-            <Link href="/registro" style={{ display: 'inline-flex', alignItems: 'center', gap: '8px', padding: '14px 28px', background: '#3B82F6', color: '#fff', borderRadius: '10px', textDecoration: 'none', fontSize: '15px', fontWeight: '700' }}>
+            <Link href="/checkout" style={{ display: 'inline-flex', alignItems: 'center', gap: '8px', padding: '14px 28px', background: '#3B82F6', color: '#fff', borderRadius: '10px', textDecoration: 'none', fontSize: '15px', fontWeight: '700' }}>
               ⚡ Assinar por R$ {precoStr}/mês
             </Link>
             <a href="#features" style={{ display: 'inline-flex', alignItems: 'center', gap: '8px', padding: '14px 28px', background: 'transparent', color: '#F1F5FA', borderRadius: '10px', textDecoration: 'none', fontSize: '15px', fontWeight: '600', border: '1px solid #243044' }}>
@@ -140,7 +140,7 @@ export default async function Home() {
                   </li>
                 ))}
               </ul>
-              <Link href="/registro" style={{ display: 'block', width: '100%', padding: '14px', background: '#3B82F6', color: '#fff', borderRadius: '10px', textDecoration: 'none', fontWeight: '700', fontSize: '15px', textAlign: 'center' }}>
+              <Link href="/checkout" style={{ display: 'block', width: '100%', padding: '14px', background: '#3B82F6', color: '#fff', borderRadius: '10px', textDecoration: 'none', fontWeight: '700', fontSize: '15px', textAlign: 'center' }}>
                 ⚡ Assinar Agora
               </Link>
               <p style={{ textAlign: 'center', fontSize: '13px', color: '#647489', marginTop: '12px' }}>Cancele a qualquer momento · Sem fidelidade</p>
@@ -182,7 +182,7 @@ export default async function Home() {
             Seu hardware merece mais do que o Windows oferece por padrão.
           </h2>
           <p style={{ fontSize: '17px', color: '#647489', marginBottom: '32px' }}>Junte-se aos gamers que já desbloquearam a performance real do seu PC.</p>
-          <Link href="/registro" style={{ display: 'inline-flex', alignItems: 'center', gap: '8px', padding: '16px 32px', background: '#3B82F6', color: '#fff', borderRadius: '10px', textDecoration: 'none', fontSize: '16px', fontWeight: '700' }}>
+          <Link href="/checkout" style={{ display: 'inline-flex', alignItems: 'center', gap: '8px', padding: '16px 32px', background: '#3B82F6', color: '#fff', borderRadius: '10px', textDecoration: 'none', fontSize: '16px', fontWeight: '700' }}>
             ⚡ Assinar por R$ {precoStr}/mês
           </Link>
         </div>
