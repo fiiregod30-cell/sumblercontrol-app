@@ -44,6 +44,15 @@ export default function RegistroPage() {
               Abra o e-mail e clique em <strong style={{ color: '#F1F5FA' }}>"Confirmar meu e-mail"</strong> para ativar sua conta. O link é válido por 24 horas.
             </p>
           </div>
+          {/* Aviso spam expandido */}
+          <div style={{ background: 'rgba(251,191,36,0.08)', border: '1px solid rgba(251,191,36,0.25)', borderRadius: '12px', padding: '16px', marginBottom: '20px', textAlign: 'left' }}>
+            <p style={{ color: '#FBBF24', fontWeight: '700', fontSize: '13px', marginBottom: '10px' }}>⚠️ NÃO ENCONTROU O E-MAIL?</p>
+            <ul style={{ listStyle: 'none', padding: 0, display: 'flex', flexDirection: 'column', gap: '6px' }}>
+              <li style={{ color: '#647489', fontSize: '13px' }}>✓ Verifique a pasta <strong style={{ color: '#F1F5FA' }}>SPAM / Lixo Eletrônico</strong></li>
+              <li style={{ color: '#647489', fontSize: '13px' }}>✓ Procure por <strong style={{ color: '#F1F5FA' }}>"SumblerControl"</strong></li>
+              <li style={{ color: '#647489', fontSize: '13px' }}>✓ Marque como <strong style={{ color: '#F1F5FA' }}>"Não é spam"</strong> para receber futuros e-mails normalmente</li>
+            </ul>
+          </div>
           <p style={{ color: '#647489', fontSize: '13px' }}>
             Não recebeu?{' '}
             <button
@@ -108,6 +117,12 @@ export default function RegistroPage() {
             <input type="password" value={form.confirmarSenha} onChange={e => setForm(p => ({ ...p, confirmarSenha: e.target.value }))} placeholder="Repita a senha" required style={inputStyle} />
           </div>
           {erro && <div style={{ background: 'rgba(239,68,68,0.1)', border: '1px solid rgba(239,68,68,0.3)', borderRadius: '8px', padding: '12px', fontSize: '13px', color: '#EF4444' }}>{erro}</div>}
+          {/* Aviso spam */}
+          <div style={{ background: 'rgba(251,191,36,0.08)', border: '1px solid rgba(251,191,36,0.2)', borderRadius: '8px', padding: '10px 14px' }}>
+            <p style={{ fontSize: '12px', color: '#FBBF24', lineHeight: 1.6 }}>
+              ⚠️ O e-mail de confirmação pode chegar na pasta <strong>SPAM</strong> ou <strong>Lixo Eletrônico</strong>. Verifique lá se não encontrar na caixa de entrada.
+            </p>
+          </div>
           <button type="submit" disabled={loading} style={btnStyle}>
             {loading ? 'Criando conta...' : 'Criar conta'}
           </button>
