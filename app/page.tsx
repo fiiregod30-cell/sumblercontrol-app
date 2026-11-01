@@ -43,17 +43,9 @@ export default async function Home() {
             Desempenho começa com<br />
             <span style={{ background: 'linear-gradient(135deg, #3B82F6, #818CF8)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent' }}>as ferramentas certas.</span>
           </h1>
-          <p style={{ fontSize: '18px', color: '#647489', lineHeight: 1.7, maxWidth: '620px', margin: '0 auto 36px' }}>
+          <p style={{ fontSize: '18px', color: '#647489', lineHeight: 1.7, maxWidth: '620px', margin: '0 auto 48px' }}>
             SumblerControl analisa, otimiza e monitora seu PC em tempo real. Identifica o que está travando sua performance e entrega os FPS que seu hardware sempre teve capacidade de dar.
           </p>
-          <div style={{ display: 'flex', gap: '14px', justifyContent: 'center', flexWrap: 'wrap', marginBottom: '56px' }}>
-            <Link href="/checkout" style={{ display: 'inline-flex', alignItems: 'center', gap: '8px', padding: '14px 28px', background: '#3B82F6', color: '#fff', borderRadius: '10px', textDecoration: 'none', fontSize: '15px', fontWeight: '700' }}>
-              ⚡ Assinar por R$ {precoStr}/mês
-            </Link>
-            <a href="#features" style={{ display: 'inline-flex', alignItems: 'center', gap: '8px', padding: '14px 28px', background: 'transparent', color: '#F1F5FA', borderRadius: '10px', textDecoration: 'none', fontSize: '15px', fontWeight: '600', border: '1px solid #243044' }}>
-              Ver recursos →
-            </a>
-          </div>
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '32px', flexWrap: 'wrap' }}>
             {[['13', 'Abas de otimização'], ['22+', 'Tweaks de sistema'], ['65+', 'Serviços gerenciados'], ['0.5ms', 'Timer Resolution']].map(([v, l]) => (
               <div key={l} style={{ textAlign: 'center' }}>
