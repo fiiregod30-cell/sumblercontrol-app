@@ -36,7 +36,7 @@ export async function POST(req: NextRequest) {
     // Busca o pedido
     const { data: pedido } = await supabaseAdmin
       .from('pedidos')
-      .select('id, usuario_id, status, link_download, cupom_id')
+      .select('id, usuario_id, status, link_download, cupom_id, plano')
       .eq('mp_payment_id', paymentId)
       .single()
 
@@ -70,8 +70,14 @@ export async function POST(req: NextRequest) {
       await supabaseAdmin.rpc('incrementar_uso_cupom', { cupom_id: pedido.cupom_id })
     }
 
-    // ── Criar ou renovar licença ──────────────────────────────
-    const expira_em = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString()
+    // ── Criar ou renovar licença com dias corretos por plano ──
+    const diasPorPlano: Record<string, number> = {
+      mensal:    30,
+      semestral: 180,
+      anual:     360,
+    }
+    const dias = diasPorPlano[pedido.plano || 'mensal'] ?? 30
+    const expira_em = new Date(Date.now() + dias * 24 * 60 * 60 * 1000).toISOString()
 
     if (licencaExistente) {
       // Renovação — Opção B: reseta tipo e key para o usuário escolher de novo

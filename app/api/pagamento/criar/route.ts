@@ -95,7 +95,8 @@ export async function POST(req: NextRequest) {
         valor_final: valorFinal,
         cupom_id: cupomUsado,
         status: 'pendente',
-        link_download: linkDownload, // sempre do banco
+        link_download: linkDownload,
+        plano: plano || 'mensal',
       })
       .select('id')
       .single()
