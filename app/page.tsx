@@ -138,7 +138,7 @@ export default async function Home() {
         <div style={{ maxWidth: '1160px', margin: '0 auto' }}>
           <div style={{ textAlign: 'center', marginBottom: '60px' }}>
             <div style={{ display: 'inline-block', padding: '4px 12px', background: 'rgba(59,130,246,0.1)', border: '1px solid rgba(59,130,246,0.2)', borderRadius: '999px', color: '#3B82F6', fontSize: '12px', fontWeight: '600', letterSpacing: '0.08em', textTransform: 'uppercase', marginBottom: '16px' }}>Recursos</div>
-            <h2 style={{ fontSize: 'clamp(1.8rem, 4vw, 2.6rem)', fontWeight: '800', letterSpacing: '-0.02em', marginBottom: '16px' }}>Tecnologia real. Resultado visível.</h2>
+            <h2 style={{ fontSize: 'clamp(1.8rem, 4vw, 2.6rem)', fontWeight: '800', letterSpacing: '-0.02em', marginBottom: '16px' }}>Mais controle sobre o desempenho do seu PC</h2>
             <p style={{ fontSize: '17px', color: '#647489', maxWidth: '560px', margin: '0 auto' }}>Cada funcionalidade resolve um problema real de performance — não são tweaks genéricos.</p>
           </div>
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(300px, 1fr))', gap: '16px' }}>
@@ -168,14 +168,26 @@ export default async function Home() {
         <div style={{ maxWidth: '1160px', margin: '0 auto' }}>
           <div style={{ textAlign: 'center', marginBottom: '48px' }}>
             <div style={{ display: 'inline-block', padding: '4px 12px', background: 'rgba(59,130,246,0.1)', border: '1px solid rgba(59,130,246,0.2)', borderRadius: '999px', color: '#3B82F6', fontSize: '12px', fontWeight: '600', letterSpacing: '0.08em', textTransform: 'uppercase', marginBottom: '16px' }}>Screenshots</div>
-            <h2 style={{ fontSize: 'clamp(1.8rem, 4vw, 2.6rem)', fontWeight: '800', letterSpacing: '-0.02em' }}>Interface profissional. Zero complicação.</h2>
+            <h2 style={{ fontSize: 'clamp(1.8rem, 4vw, 2.6rem)', fontWeight: '800', letterSpacing: '-0.02em' }}>Tudo o que você precisa em um só lugar</h2>
           </div>
-          <div style={{ maxWidth: '900px', margin: '0 auto' }}>
-            <Image src="/assets/SumblerControl.png" alt="SumblerControl painel completo" width={1200} height={675} style={{ width: '100%', height: 'auto', borderRadius: '16px', border: '1px solid #243044', boxShadow: '0 24px 80px rgba(0,0,0,0.5)' }} />
-            <div style={{ textAlign: 'center', marginTop: '20px' }}>
-              <h4 style={{ fontSize: '17px', fontWeight: '700', marginBottom: '8px' }}>Painel Completo de Otimização</h4>
-              <p style={{ fontSize: '14px', color: '#647489' }}>13 abas — Sistema, Monitor, Otimizações, Benchmark, Gargalo, Overlay FPS, Frametime, Rede, Disco, Serviços e mais.</p>
-            </div>
+          {/* Grid de 3 imagens */}
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(320px, 1fr))', gap: '20px' }}>
+            {[
+              { src: '/assets/imagem_NOVA1.png', alt: 'SumblerControl — Painel de otimizações', label: 'Otimizações de Gaming' },
+              { src: '/assets/imagem_NOVA2.png', alt: 'SumblerControl — Análise de gargalo', label: 'Análise de Gargalo' },
+              { src: '/assets/imagem_NOVA3.png', alt: 'SumblerControl — Benchmark e diagnóstico', label: 'Benchmark e Diagnóstico' },
+            ].map(img => (
+              <div key={img.src}>
+                <Image
+                  src={img.src}
+                  alt={img.alt}
+                  width={800}
+                  height={450}
+                  style={{ width: '100%', height: 'auto', borderRadius: '12px', border: '1px solid #243044', boxShadow: '0 16px 48px rgba(0,0,0,0.4)', display: 'block' }}
+                />
+                <p style={{ textAlign: 'center', fontSize: '14px', color: '#647489', marginTop: '12px', fontWeight: '600' }}>{img.label}</p>
+              </div>
+            ))}
           </div>
         </div>
       </section>
