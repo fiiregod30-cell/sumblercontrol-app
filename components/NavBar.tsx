@@ -80,7 +80,7 @@ export default function NavBar() {
 
           {/* Links */}
           <div style={{ display: 'flex', gap: '4px' }}>
-            {[['#features', 'Recursos'], ['#screenshots', 'Screenshots'], ['#preco', 'Preço'], ['#faq', 'FAQ']].map(([href, label]) => (
+            {[['#features', 'Recursos'], ['#preco', 'Planos'], ['#faq', 'FAQ']].map(([href, label]) => (
               <a key={href} href={href} style={{ padding: '6px 14px', borderRadius: '6px', textDecoration: 'none', color: '#647489', fontSize: '14px', fontWeight: '500' }}>{label}</a>
             ))}
           </div>
@@ -136,9 +136,9 @@ export default function NavBar() {
                 Entrar
               </Link>
             )}
-            <Link href="/checkout" style={{ padding: '8px 18px', background: '#3B82F6', color: '#fff', borderRadius: '8px', textDecoration: 'none', fontSize: '14px', fontWeight: '600' }}>
-              Assinar Agora
-            </Link>
+            <a href="#preco" style={{ padding: '8px 18px', background: '#3B82F6', color: '#fff', borderRadius: '8px', textDecoration: 'none', fontSize: '14px', fontWeight: '600' }}>
+              Ver Planos
+            </a>
           </div>
         </div>
       </nav>

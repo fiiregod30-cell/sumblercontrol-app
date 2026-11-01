@@ -5,7 +5,6 @@ import { createPixPayment } from '@/lib/mercadopago'
 
 export async function POST(req: NextRequest) {
   try {
-    // Verifica autenticação
     const token = req.cookies.get('sc_token')?.value
     if (!token)
       return NextResponse.json({ error: 'Não autenticado' }, { status: 401 })
@@ -14,9 +13,8 @@ export async function POST(req: NextRequest) {
     if (!payload || payload.role !== 'user')
       return NextResponse.json({ error: 'Token inválido' }, { status: 401 })
 
-    const { cupomId } = await req.json()
+    const { cupomId, plano } = await req.json()
 
-    // Busca dados do usuário
     const { data: user } = await supabaseAdmin
       .from('usuarios')
       .select('id, nome, sobrenome, email')
@@ -26,7 +24,7 @@ export async function POST(req: NextRequest) {
     if (!user)
       return NextResponse.json({ error: 'Usuário não encontrado' }, { status: 404 })
 
-    // Verifica se já tem pedido pendente
+    // Verifica pedido pendente recente
     const { data: pedidoPendente } = await supabaseAdmin
       .from('pedidos')
       .select('id, pix_qr_code, pix_copia_cola, valor_final, criado_em')
@@ -36,14 +34,9 @@ export async function POST(req: NextRequest) {
       .single()
 
     if (pedidoPendente) {
-      // Se tem cupom novo sendo aplicado, cancela pedido antigo e cria novo
       if (cupomId) {
-        await supabaseAdmin
-          .from('pedidos')
-          .update({ status: 'cancelado' })
-          .eq('id', pedidoPendente.id)
+        await supabaseAdmin.from('pedidos').update({ status: 'cancelado' }).eq('id', pedidoPendente.id)
       } else if (pedidoPendente.pix_qr_code && pedidoPendente.pix_copia_cola) {
-        // Sem cupom — reutiliza pedido existente com QR Code válido
         return NextResponse.json({
           pedidoId: pedidoPendente.id,
           qrCode: pedidoPendente.pix_qr_code,
@@ -52,28 +45,35 @@ export async function POST(req: NextRequest) {
           existente: true
         })
       } else {
-        // Pedido corrompido — cancela e cria novo
-        await supabaseAdmin
-          .from('pedidos')
-          .update({ status: 'cancelado' })
-          .eq('id', pedidoPendente.id)
+        await supabaseAdmin.from('pedidos').update({ status: 'cancelado' }).eq('id', pedidoPendente.id)
       }
     }
 
-    // Calcula valor buscando preço atual do banco
-    const { data: cfgData } = await supabaseAdmin.from('config_site').select('preco').eq('id', 1).single()
+    // Busca configurações do banco — preço correto por plano + link de download
+    const { data: cfgData } = await supabaseAdmin
+      .from('config_site')
+      .select('preco, preco_semestral, preco_anual, link_download')
+      .eq('id', 1)
+      .single()
+
+    // Seleciona o preço conforme o plano
     let valorOriginal = cfgData?.preco ?? 31.99
+    if (plano === 'semestral') valorOriginal = cfgData?.preco_semestral ?? 134.90
+    if (plano === 'anual')     valorOriginal = cfgData?.preco_anual    ?? 289.90
+
+    // Link de download sempre do banco (admin pode atualizar)
+    const linkDownload = cfgData?.link_download || process.env.DOWNLOAD_LINK || ''
+
+    // Label do plano para descrição do PIX
+    const planoLabel = plano === 'semestral' ? 'Plano Semestral' : plano === 'anual' ? 'Plano Anual' : 'Plano Mensal'
+
     let valorDesconto = 0
     let valorFinal = valorOriginal
     let cupomUsado = null
 
     if (cupomId) {
       const { data: cupom } = await supabaseAdmin
-        .from('cupons')
-        .select('*')
-        .eq('id', cupomId)
-        .eq('ativo', true)
-        .single()
+        .from('cupons').select('*').eq('id', cupomId).eq('ativo', true).single()
 
       if (cupom) {
         if (cupom.tipo === 'porcentagem') {
@@ -81,13 +81,11 @@ export async function POST(req: NextRequest) {
         } else {
           valorDesconto = Math.min(cupom.valor, valorOriginal)
         }
-        valorFinal = Math.max(0.01, valorOriginal - valorDesconto)
-        valorFinal = Math.round(valorFinal * 100) / 100
+        valorFinal = Math.max(0.01, Math.round((valorOriginal - valorDesconto) * 100) / 100)
         cupomUsado = cupom.id
       }
     }
 
-    // Cria pedido no banco
     const { data: pedido, error: pedidoError } = await supabaseAdmin
       .from('pedidos')
       .insert({
@@ -97,7 +95,7 @@ export async function POST(req: NextRequest) {
         valor_final: valorFinal,
         cupom_id: cupomUsado,
         status: 'pendente',
-        link_download: process.env.DOWNLOAD_LINK,
+        link_download: linkDownload, // sempre do banco
       })
       .select('id')
       .single()
@@ -105,32 +103,21 @@ export async function POST(req: NextRequest) {
     if (pedidoError || !pedido)
       return NextResponse.json({ error: 'Erro ao criar pedido' }, { status: 500 })
 
-    // Gera QR Code PIX no Mercado Pago
     const pixData = await createPixPayment({
       amount: valorFinal,
       email: user.email,
       firstName: user.nome,
       lastName: user.sobrenome,
-      description: 'SumblerControl — Plano Mensal',
+      description: `SumblerControl — ${planoLabel}`,
       externalRef: pedido.id,
     })
 
-    // Salva dados do PIX no pedido
     await supabaseAdmin
       .from('pedidos')
-      .update({
-        mp_payment_id: pixData.id,
-        pix_qr_code: pixData.qrCodeBase64,
-        pix_copia_cola: pixData.qrCode,
-      })
+      .update({ mp_payment_id: pixData.id, pix_qr_code: pixData.qrCodeBase64, pix_copia_cola: pixData.qrCode })
       .eq('id', pedido.id)
 
-    return NextResponse.json({
-      pedidoId: pedido.id,
-      qrCode: pixData.qrCodeBase64,
-      copiaCola: pixData.qrCode,
-      valorFinal,
-    })
+    return NextResponse.json({ pedidoId: pedido.id, qrCode: pixData.qrCodeBase64, copiaCola: pixData.qrCode, valorFinal })
   } catch (err) {
     console.error('Erro ao criar pagamento:', err)
     return NextResponse.json({ error: 'Erro ao processar pagamento' }, { status: 500 })

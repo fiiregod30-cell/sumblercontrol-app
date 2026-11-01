@@ -66,10 +66,11 @@ export default function CheckoutPage() {
     if (!cupom.trim()) return
     setCupomErro(''); setCupomLoading(true)
     try {
+      const plano = new URLSearchParams(window.location.search).get('plano') || 'mensal'
       const res = await fetch('/api/cupom/validar', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ codigo: cupom })
+        body: JSON.stringify({ codigo: cupom, plano })
       })
       const data = await res.json()
       if (!res.ok) { setCupomErro(data.error); setCupomData(null); return }
@@ -80,10 +81,11 @@ export default function CheckoutPage() {
   async function gerarPix() {
     setErro(''); setLoading(true)
     try {
+      const plano = new URLSearchParams(window.location.search).get('plano') || 'mensal'
       const res = await fetch('/api/pagamento/criar', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ cupomId: cupomData?.cupomId || null })
+        body: JSON.stringify({ cupomId: cupomData?.cupomId || null, plano })
       })
       const data = await res.json()
       if (res.status === 401) { router.push('/login'); return }

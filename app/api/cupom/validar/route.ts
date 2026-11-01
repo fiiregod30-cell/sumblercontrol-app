@@ -3,7 +3,7 @@ import { supabaseAdmin } from '@/lib/supabase'
 
 export async function POST(req: NextRequest) {
   try {
-    const { codigo } = await req.json()
+    const { codigo, plano } = await req.json()
 
     if (!codigo?.trim())
       return NextResponse.json({ error: 'Código obrigatório' }, { status: 400 })
@@ -18,17 +18,23 @@ export async function POST(req: NextRequest) {
     if (!cupom)
       return NextResponse.json({ error: 'Cupom inválido ou expirado' }, { status: 404 })
 
-    // Verifica expiração
     if (cupom.expira_em && new Date(cupom.expira_em) < new Date())
       return NextResponse.json({ error: 'Cupom expirado' }, { status: 400 })
 
-    // Verifica limite de usos
     if (cupom.usos_maximos !== null && cupom.usos_atuais >= cupom.usos_maximos)
       return NextResponse.json({ error: 'Cupom atingiu o limite de usos' }, { status: 400 })
 
-    // Calcula desconto — busca preço atual do banco
-    const { data: cfg } = await supabaseAdmin.from('config_site').select('preco').eq('id', 1).single()
-    const precoOriginal = cfg?.preco ?? 31.99
+    // Busca o preço correto conforme o plano
+    const { data: cfg } = await supabaseAdmin
+      .from('config_site')
+      .select('preco, preco_semestral, preco_anual')
+      .eq('id', 1)
+      .single()
+
+    let precoOriginal = cfg?.preco ?? 31.99
+    if (plano === 'semestral') precoOriginal = cfg?.preco_semestral ?? 134.90
+    if (plano === 'anual')     precoOriginal = cfg?.preco_anual    ?? 289.90
+
     let desconto = 0
     let precoFinal = precoOriginal
 
@@ -41,7 +47,7 @@ export async function POST(req: NextRequest) {
     }
 
     precoFinal = Math.max(0.01, Math.round(precoFinal * 100) / 100)
-    desconto = Math.round(desconto * 100) / 100
+    desconto   = Math.round(desconto * 100) / 100
 
     return NextResponse.json({
       valido: true,
