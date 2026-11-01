@@ -38,8 +38,15 @@ export default function MinhaContaPage() {
   const [licenca, setLicenca] = useState<Licenca | null>(null)
   const [loading, setLoading] = useState(true)
   const [copiado, setCopiado] = useState(false)
+  const [linkDownload, setLinkDownload] = useState('')
 
   useEffect(() => {
+    // Busca link de download ao vivo do banco
+    fetch('/api/config-publica')
+      .then(r => r.json())
+      .then(d => { if (d.linkDownload) setLinkDownload(d.linkDownload) })
+      .catch(() => {})
+
     Promise.all([
       fetch('/api/minha-conta', { credentials: 'include' }),
       fetch('/api/minha-licenca', { credentials: 'include' }),
@@ -207,8 +214,8 @@ export default function MinhaContaPage() {
                       <span style={{ padding: '4px 10px', borderRadius: '999px', fontSize: '12px', background: p.status === 'pago' ? 'rgba(34,197,94,0.1)' : 'rgba(251,191,36,0.1)', color: p.status === 'pago' ? '#22C55E' : '#FBBF24' }}>
                         {p.status === 'pago' ? '✓ Pago' : '⏳ Pendente'}
                       </span>
-                      {p.status === 'pago' && p.link_download && (
-                        <a href={p.link_download} target="_blank" rel="noopener noreferrer" style={{ padding: '6px 14px', background: '#3B82F6', color: '#fff', borderRadius: '8px', textDecoration: 'none', fontSize: '12px', fontWeight: '600' }}>
+                      {p.status === 'pago' && linkDownload && (
+                        <a href={linkDownload} target="_blank" rel="noopener noreferrer" style={{ padding: '6px 14px', background: '#3B82F6', color: '#fff', borderRadius: '8px', textDecoration: 'none', fontSize: '12px', fontWeight: '600' }}>
                           ⬇️ Baixar
                         </a>
                       )}
