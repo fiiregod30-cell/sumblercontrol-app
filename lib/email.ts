@@ -1,7 +1,17 @@
 import nodemailer from 'nodemailer'
+import { supabaseAdmin } from './supabase'
 
-const DOWNLOAD_LINK = process.env.DOWNLOAD_LINK!
 const SITE_URL = process.env.NEXT_PUBLIC_SITE_URL!
+
+// Busca o link de download sempre do banco (admin pode atualizar)
+async function getDownloadLink(): Promise<string> {
+  const { data } = await supabaseAdmin
+    .from('config_site')
+    .select('link_download')
+    .eq('id', 1)
+    .single()
+  return data?.link_download || process.env.DOWNLOAD_LINK || ''
+}
 
 // Transporter Gmail via App Password
 const transporter = nodemailer.createTransport({
@@ -41,6 +51,7 @@ export async function sendConfirmationEmail(email: string, name: string, token: 
 
 // ── E-mail de entrega após pagamento confirmado ──────────────
 export async function sendDownloadEmail(email: string, name: string, pedidoId: string) {
+  const DOWNLOAD_LINK = await getDownloadLink()
   await transporter.sendMail({
     from: FROM,
     to: email,
@@ -69,6 +80,7 @@ export async function sendDownloadEmail(email: string, name: string, pedidoId: s
 
 // ── E-mail de reenvio manual (admin) ─────────────────────────
 export async function sendDownloadEmailManual(email: string, name: string) {
+  const DOWNLOAD_LINK = await getDownloadLink()
   await transporter.sendMail({
     from: FROM,
     to: email,
@@ -88,7 +100,6 @@ export async function sendDownloadEmailManual(email: string, name: string) {
 // ── E-mail com a key após ativação ───────────────────────────
 export async function sendLicensaEmail(email: string, name: string, key: string) {
   await transporter.sendMail({
-    from: FROM,
     to: email,
     subject: `🔑 Sua licença SumblerControl — ${key}`,
     html: `
