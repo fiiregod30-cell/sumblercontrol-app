@@ -59,6 +59,8 @@ export default function MinhaContaPage() {
     if (r.ok) {
       setUsuario(prev => prev ? { ...prev, avatar_url: d.avatar_url } : prev)
       setUploadMsg('✓ Foto atualizada!')
+      // Notifica o widget para recarregar mensagens com o novo avatar
+      window.dispatchEvent(new CustomEvent('avatar-atualizado', { detail: { avatar_url: d.avatar_url } }))
     } else {
       setUploadMsg('✗ ' + (d.error || 'Erro ao enviar imagem.'))
     }
@@ -74,6 +76,8 @@ export default function MinhaContaPage() {
     await fetch('/api/minha-conta/avatar', { method: 'DELETE', credentials: 'include' })
     setUsuario(prev => prev ? { ...prev, avatar_url: null } : prev)
     setUploadMsg('✓ Foto removida.')
+    // Notifica o widget para recarregar mensagens sem avatar
+    window.dispatchEvent(new CustomEvent('avatar-atualizado', { detail: { avatar_url: null } }))
     setUploadando(false)
   }
 
@@ -92,8 +96,8 @@ export default function MinhaContaPage() {
       {/* Nav */}
       <nav style={{ position: 'fixed', top: 0, left: 0, right: 0, zIndex: 100, background: 'rgba(9,15,26,0.9)', backdropFilter: 'blur(16px)', borderBottom: '1px solid #1E2939', height: '64px', display: 'flex', alignItems: 'center', padding: '0 24px', justifyContent: 'space-between' }}>
         <Link href="/" style={{ display: 'flex', alignItems: 'center', gap: '8px', textDecoration: 'none', color: '#F1F5FA', fontWeight: '700' }}>
-          <div style={{ width: '30px', height: '30px', background: 'rgba(59,130,246,0.12)', border: '1px solid rgba(59,130,246,0.3)', borderRadius: '6px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none"><circle cx="12" cy="12" r="9" stroke="#3B82F6" strokeWidth="2"/><circle cx="12" cy="12" r="4" stroke="#3B82F6" strokeWidth="2"/></svg>
+          <div style={{ width: '30px', height: '30px', borderRadius: '6px', overflow: 'hidden', flexShrink: 0 }}>
+            <img src="/assets/logomarca.png" alt="SumblerControl" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
           </div>
           SumblerControl
         </Link>

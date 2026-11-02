@@ -90,6 +90,13 @@ export default function SupportWidget() {
     return () => { if (chatPollingRef.current) clearInterval(chatPollingRef.current) }
   }, [aberto, aba])
 
+  // Recarrega mensagens imediatamente quando avatar é atualizado
+  useEffect(() => {
+    function onAvatarAtualizado() { carregarMensagens() }
+    window.addEventListener('avatar-atualizado', onAvatarAtualizado)
+    return () => window.removeEventListener('avatar-atualizado', onAvatarAtualizado)
+  }, [])
+
   // Scroll automático no chat
   useEffect(() => {
     if (aberto && aba === 'chat')
