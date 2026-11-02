@@ -45,11 +45,13 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ valido: false, motivo: 'Login e senha obrigatórios.' }, { status: 400 })
     }
 
-    // 2.5. Valida nonce (obrigatório a partir do protocolo v2)
-    // Clientes legados sem nonce ainda são aceitos se a licença não tiver device_secret
-    // (compatibilidade retroativa — será removida na Fase 4)
+    // 2.5. Valida nonce — obrigatório no protocolo v2
     let nonceValido = false
-    if (nonce) {
+    if (!nonce) {
+      return NextResponse.json({ valido: false, motivo: 'Atualize o aplicativo para continuar.' }, { status: 400 })
+    }
+
+    {
       const { data: nonceRow } = await supabaseAdmin
         .from('nonces')
         .select('id, expira_em, usado')
@@ -160,15 +162,18 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ valido: false, motivo: 'Licença expirada. Renove sua assinatura.' })
     }
 
-    // 9. HWID + HMAC — lógica v2 com compatibilidade retroativa
+    // 9. HWID + HMAC — protocolo v2 obrigatório (sem compatibilidade legada)
     const deviceSecret = licenca.device_secret as string | null
 
     if (!licenca.hwid) {
       // ── 1ª ATIVAÇÃO ──────────────────────────────────────────
-      // Nonce obrigatório na 1ª ativação para clientes v2
-      // Clientes legados (sem nonce) ainda passam se ainda não têm secret
+      // Nonce obrigatório — sem nonce válido não ativa
+      if (!nonceValido) {
+        await registrarLog(licenca.id as string, ip, hwid, false, 'Nonce ausente na 1ª ativação')
+        return NextResponse.json({ valido: false, motivo: 'Atualize o aplicativo para ativar.' })
+      }
+
       if (hmac && hmac !== '') {
-        // Nenhum secret existe ainda — não deveria ter HMAC
         await registrarLog(licenca.id as string, ip, hwid, false, 'HMAC inesperado na 1ª ativação')
         return NextResponse.json({ valido: false, motivo: 'Erro de ativação. Reinicie o aplicativo.' })
       }
@@ -209,19 +214,25 @@ export async function POST(req: NextRequest) {
         deviceSecret: novoSecret,
       })
 
-    } else if (deviceSecret) {
-      // ── VALIDAÇÃO V2: HMAC obrigatório ────────────────────────
+    } else {
+      // ── VALIDAÇÃO V2: nonce + HMAC obrigatórios ───────────────
       if (!nonceValido) {
-        await registrarLog(licenca.id as string, ip, hwid, false, 'Nonce ausente em validação v2')
-        return NextResponse.json({ valido: false, motivo: 'Nonce obrigatório. Atualize o aplicativo.' })
+        await registrarLog(licenca.id as string, ip, hwid, false, 'Nonce ausente')
+        return NextResponse.json({ valido: false, motivo: 'Atualize o aplicativo para continuar.' })
       }
 
       if (!hmac || hmac === '') {
         await registrarLog(licenca.id as string, ip, hwid, false, 'HMAC ausente')
-        return NextResponse.json({ valido: false, motivo: 'HMAC obrigatório. Atualize o aplicativo.' })
+        return NextResponse.json({ valido: false, motivo: 'Atualize o aplicativo para continuar.' })
       }
 
-      // Verifica HWID (hardware deve ser o mesmo)
+      if (!deviceSecret) {
+        // Licença tem HWID mas não tem device_secret — estado inválido, força re-ativação
+        await registrarLog(licenca.id as string, ip, hwid, false, 'device_secret ausente')
+        return NextResponse.json({ valido: false, motivo: 'Reativação necessária. Contate o suporte.' })
+      }
+
+      // Verifica HWID
       if (licenca.hwid !== hwid) {
         await registrarLog(licenca.id as string, ip, hwid, false, 'HWID não autorizado')
         return NextResponse.json({
@@ -230,24 +241,13 @@ export async function POST(req: NextRequest) {
         })
       }
 
-      // Verifica HMAC — nonce já foi marcado como usado acima
+      // Verifica HMAC
       const expectedHmac = computeHMAC(deviceSecret, nonce, hwid)
       if (hmac !== expectedHmac) {
         await registrarLog(licenca.id as string, ip, hwid, false, 'HMAC inválido')
         return NextResponse.json({
           valido: false,
           motivo: 'Autenticação inválida. Contate o suporte.',
-        })
-      }
-
-    } else {
-      // ── COMPATIBILIDADE LEGADA: HWID salvo mas sem device_secret ──
-      // Cliente antigo sem suporte a HMAC — verificação simples de HWID
-      if (licenca.hwid !== hwid) {
-        await registrarLog(licenca.id as string, ip, hwid, false, 'HWID não autorizado (legado)')
-        return NextResponse.json({
-          valido: false,
-          motivo: 'Esta licença está registrada em outro PC. Contate o suporte para trocar de PC.',
         })
       }
     }
