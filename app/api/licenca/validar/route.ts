@@ -94,12 +94,15 @@ export async function POST(req: NextRequest) {
         return NextResponse.json({ valido: false, motivo: 'Usuário ou senha incorretos.' })
       }
 
-      // Busca licença do usuário
+      // Busca licença ativa mais recente do usuário (qualquer plano)
       const { data } = await supabaseAdmin
         .from('licencas')
         .select('*, usuarios(nome, sobrenome)')
         .eq('usuario_id', usuario.id)
         .eq('tipo', 'usuario_senha')
+        .eq('ativa', true)
+        .order('criado_em', { ascending: false })
+        .limit(1)
         .single()
       licenca = data
     }

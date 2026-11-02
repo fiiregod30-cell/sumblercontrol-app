@@ -84,7 +84,7 @@ function ObrigadoContent() {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         credentials: 'include',
-        body: JSON.stringify({ tipo })
+        body: JSON.stringify({ tipo, pedidoId })
       })
       const data = await res.json()
 

@@ -13,19 +13,37 @@ export async function POST(req: NextRequest) {
     if (!payload || payload.role !== 'user')
       return NextResponse.json({ error: 'Token inválido' }, { status: 401 })
 
-    const { tipo } = await req.json()
+    const { tipo, pedidoId } = await req.json()
+
     if (!tipo || !['key', 'usuario_senha'].includes(tipo))
       return NextResponse.json({ error: 'Tipo inválido. Use: key ou usuario_senha' }, { status: 400 })
 
-    // Busca licença do usuário com tipo null
-    const { data: licenca } = await supabaseAdmin
-      .from('licencas')
-      .select('id, tipo, key')
-      .eq('usuario_id', payload.id)
-      .is('tipo', null)
-      .order('criado_em', { ascending: false })
-      .limit(1)
-      .single()
+    // Busca a licença pelo pedido_id — exclusiva deste pedido
+    let licenca = null
+
+    if (pedidoId) {
+      const { data } = await supabaseAdmin
+        .from('licencas')
+        .select('id, tipo, key')
+        .eq('pedido_id', pedidoId)
+        .eq('usuario_id', payload.id)
+        .is('tipo', null)
+        .single()
+      licenca = data
+    }
+
+    // Fallback: busca a licença pendente mais recente do usuário (sem pedido_id ainda)
+    if (!licenca) {
+      const { data } = await supabaseAdmin
+        .from('licencas')
+        .select('id, tipo, key')
+        .eq('usuario_id', payload.id)
+        .is('tipo', null)
+        .order('criado_em', { ascending: false })
+        .limit(1)
+        .single()
+      licenca = data
+    }
 
     if (!licenca)
       return NextResponse.json({ error: 'Nenhuma licença pendente encontrada.' }, { status: 404 })
@@ -33,7 +51,7 @@ export async function POST(req: NextRequest) {
     let keyGerada: string | null = null
 
     if (tipo === 'key') {
-      // Gera uma key única — sempre nova, independente de já ter uma anterior
+      // Gera uma key única e aleatória para este pedido
       let tentativas = 0
       do {
         keyGerada = gerarKey()
@@ -57,7 +75,7 @@ export async function POST(req: NextRequest) {
       .update({ tipo, key: keyGerada })
       .eq('id', licenca.id)
 
-    // Busca dados do usuário para enviar e-mail
+    // Envia e-mail com a key se tipo = key
     const { data: usuario } = await supabaseAdmin
       .from('usuarios')
       .select('nome, email')
@@ -68,11 +86,7 @@ export async function POST(req: NextRequest) {
       await sendLicensaEmail(usuario.email, usuario.nome, keyGerada).catch(console.error)
     }
 
-    return NextResponse.json({
-      success: true,
-      tipo,
-      key: keyGerada,
-    })
+    return NextResponse.json({ success: true, tipo, key: keyGerada })
   } catch (err) {
     console.error('Erro ao escolher tipo:', err)
     return NextResponse.json({ error: 'Erro interno' }, { status: 500 })

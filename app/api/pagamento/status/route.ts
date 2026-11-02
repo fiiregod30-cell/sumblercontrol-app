@@ -6,7 +6,7 @@ import { sendDownloadEmail } from '@/lib/email'
 
 async function processarPagamentoConfirmado(pedidoId: string, usuarioId: string) {
   try {
-    console.log('[STATUS-FALLBACK] Processando pagamento confirmado pelo MP:', pedidoId)
+    console.log('[STATUS-FALLBACK] Processando:', pedidoId)
 
     const { data: pedido } = await supabaseAdmin
       .from('pedidos')
@@ -14,55 +14,32 @@ async function processarPagamentoConfirmado(pedidoId: string, usuarioId: string)
       .eq('id', pedidoId)
       .single()
 
-    if (!pedido || pedido.status === 'pago') {
-      console.log('[STATUS-FALLBACK] Pedido já pago ou não encontrado, pulando')
-      return
-    }
-
-    const { data: licencaExistente } = await supabaseAdmin
-      .from('licencas')
-      .select('id, expira_em, ativa')
-      .eq('usuario_id', usuarioId)
-      .order('criado_em', { ascending: false })
-      .limit(1)
-      .single()
-
-    const ehRenovacao = !!licencaExistente
+    if (!pedido || pedido.status === 'pago') return
 
     await supabaseAdmin
       .from('pedidos')
-      .update({ status: 'pago', pago_em: new Date().toISOString(), renovacao: ehRenovacao })
+      .update({ status: 'pago', pago_em: new Date().toISOString() })
       .eq('id', pedidoId)
-
-    console.log('[STATUS-FALLBACK] Pedido marcado como pago')
 
     if (pedido.cupom_id) {
       await supabaseAdmin.rpc('incrementar_uso_cupom', { cupom_id: pedido.cupom_id })
     }
 
+    // Cria licença nova e independente para este pedido
     const diasPorPlano: Record<string, number> = { mensal: 30, semestral: 180, anual: 360 }
     const dias = diasPorPlano[pedido.plano || 'mensal'] ?? 30
     const expira_em = new Date(Date.now() + dias * 24 * 60 * 60 * 1000).toISOString()
 
-    if (licencaExistente) {
-      const base = new Date(licencaExistente.expira_em) > new Date()
-        ? new Date(licencaExistente.expira_em)
-        : new Date()
-      const novaExpiracao = new Date(base.getTime() + dias * 24 * 60 * 60 * 1000).toISOString()
+    await supabaseAdmin.from('licencas').insert({
+      usuario_id: usuarioId,
+      pedido_id: pedidoId,
+      tipo: null,
+      key: null,
+      ativa: true,
+      expira_em,
+    })
 
-      await supabaseAdmin
-        .from('licencas')
-        .update({ expira_em: novaExpiracao, ativa: true, tipo: null, key: null, hwid: null, hwid_registrado_em: null })
-        .eq('id', licencaExistente.id)
-
-      console.log('[STATUS-FALLBACK] Licença renovada até:', novaExpiracao)
-    } else {
-      await supabaseAdmin
-        .from('licencas')
-        .insert({ usuario_id: usuarioId, tipo: null, key: null, ativa: true, expira_em })
-
-      console.log('[STATUS-FALLBACK] Licença criada, expira em:', expira_em)
-    }
+    console.log('[STATUS-FALLBACK] Licença criada, expira:', expira_em)
 
     const { data: user } = await supabaseAdmin
       .from('usuarios')
@@ -76,7 +53,7 @@ async function processarPagamentoConfirmado(pedidoId: string, usuarioId: string)
       )
     }
 
-    console.log('[STATUS-FALLBACK] Processamento completo com sucesso')
+    console.log('[STATUS-FALLBACK] Processamento completo')
   } catch (err) {
     console.error('[STATUS-FALLBACK] Erro crítico:', err)
   }
@@ -85,52 +62,51 @@ async function processarPagamentoConfirmado(pedidoId: string, usuarioId: string)
 export async function GET(req: NextRequest) {
   try {
     const token = req.cookies.get('sc_token')?.value
-    if (!token) {
-      console.log('[STATUS] Sem token de autenticação')
-      return NextResponse.json({ error: 'Não autenticado' }, { status: 401 })
-    }
+    if (!token) return NextResponse.json({ error: 'Não autenticado' }, { status: 401 })
 
     const payload = verifyToken(token)
-    if (!payload) {
-      console.log('[STATUS] Token inválido')
-      return NextResponse.json({ error: 'Token inválido' }, { status: 401 })
-    }
+    if (!payload) return NextResponse.json({ error: 'Token inválido' }, { status: 401 })
 
     const pedidoId = req.nextUrl.searchParams.get('pedidoId')
     if (!pedidoId) return NextResponse.json({ error: 'pedidoId obrigatório' }, { status: 400 })
 
-    const { data: pedido, error: pedidoError } = await supabaseAdmin
+    const { data: pedido } = await supabaseAdmin
       .from('pedidos')
       .select('id, status, link_download, mp_payment_id')
       .eq('id', pedidoId)
       .eq('usuario_id', payload.id)
       .single()
 
-    if (pedidoError) {
-      console.error('[STATUS] Erro ao buscar pedido no Supabase:', pedidoError)
-    }
+    if (!pedido) return NextResponse.json({ error: 'Pedido não encontrado' }, { status: 404 })
 
-    if (!pedido) {
-      console.log('[STATUS] Pedido não encontrado:', pedidoId, 'usuario:', payload.id)
-      return NextResponse.json({ error: 'Pedido não encontrado' }, { status: 404 })
-    }
+    console.log('[STATUS] Pedido encontrado — id:', pedidoId, 'status:', pedido.status)
 
-    console.log('[STATUS] Pedido encontrado — id:', pedidoId, 'status:', pedido.status, 'mp_payment_id:', pedido.mp_payment_id)
-
-    // Já pago no banco — retorna direto
     if (pedido.status === 'pago') {
       return NextResponse.json({ status: 'pago', linkDownload: pedido.link_download })
     }
 
-    // Pendente e tem mp_payment_id — consulta o MP diretamente como fallback do webhook
     if (pedido.status === 'pendente' && pedido.mp_payment_id) {
       try {
         const mpStatus = await getPaymentStatus(pedido.mp_payment_id)
-        console.log('[STATUS] Status no MP:', mpStatus, 'para payment_id:', pedido.mp_payment_id)
+        console.log('[STATUS] Status no MP:', mpStatus)
 
         if (mpStatus === 'approved') {
-          console.log('[STATUS] MP confirmou pagamento — acionando fallback')
-          await processarPagamentoConfirmado(pedidoId, payload.id)
+          // Verifica se licença já foi criada por outro processo (idempotência)
+          const { data: licExiste } = await supabaseAdmin
+            .from('licencas')
+            .select('id')
+            .eq('pedido_id', pedidoId)
+            .single()
+
+          if (!licExiste) {
+            await processarPagamentoConfirmado(pedidoId, payload.id)
+          } else {
+            // Licença já existe (webhook chegou antes) — só marca o pedido
+            await supabaseAdmin
+              .from('pedidos')
+              .update({ status: 'pago', pago_em: new Date().toISOString() })
+              .eq('id', pedidoId)
+          }
           return NextResponse.json({ status: 'pago', linkDownload: pedido.link_download })
         }
 
