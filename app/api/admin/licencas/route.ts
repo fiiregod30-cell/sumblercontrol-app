@@ -19,16 +19,45 @@ export async function GET(req: NextRequest) {
   const { data } = await supabaseAdmin
     .from('licencas')
     .select(`
-      id, tipo, key, ativa, expira_em, hwid, hwid_registrado_em, hwid_resetado_em, ultimo_acesso, criado_em,
+      id, tipo, key, ativa, expira_em, hwid, hwid_registrado_em, hwid_resetado_em,
+      hwid_reset_count, ultimo_acesso, criado_em,
       usuarios(nome, sobrenome, email)
     `)
     .order('criado_em', { ascending: false })
+
+  // Para cada licença, busca contagem de HWIDs distintos nas últimas 24h (detecção de spoof/sharing)
+  const licencaIds = (data || []).map(l => l.id)
+
+  let spoofMap: Record<string, number> = {}
+  if (licencaIds.length > 0) {
+    const { data: logsRecentes } = await supabaseAdmin
+      .from('licenca_logs')
+      .select('licenca_id, hwid')
+      .in('licenca_id', licencaIds)
+      .gte('criado_em', new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString())
+      .eq('sucesso', true)
+
+    // Conta HWIDs distintos por licença
+    const hwidsMap: Record<string, Set<string>> = {}
+    for (const log of logsRecentes || []) {
+      if (!log.licenca_id || !log.hwid) continue
+      if (!hwidsMap[log.licenca_id]) hwidsMap[log.licenca_id] = new Set()
+      hwidsMap[log.licenca_id].add(log.hwid)
+    }
+    for (const [id, set] of Object.entries(hwidsMap)) {
+      spoofMap[id] = set.size
+    }
+  }
 
   // Mascara o HWID — mostra só os primeiros 8 chars
   const resultado = (data || []).map(l => ({
     ...l,
     hwid: l.hwid ? l.hwid.substring(0, 8) + '...' : null,
     statusHwid: !l.tipo ? 'pendente' : !l.hwid ? 'pendente' : new Date(l.expira_em) < new Date() ? 'expirada' : 'ativado',
+    hwid_reset_count: l.hwid_reset_count || 0,
+    // spoofSuspeito = true se 2+ HWIDs distintos validaram com sucesso nas últimas 24h
+    spoofSuspeito: (spoofMap[l.id] || 0) >= 2,
+    hwidsDistintos24h: spoofMap[l.id] || 0,
   }))
 
   return NextResponse.json(resultado)

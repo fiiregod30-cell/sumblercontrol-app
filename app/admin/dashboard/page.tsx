@@ -11,6 +11,7 @@ interface Config { preco: number; preco_semestral: number; preco_anual: number; 
 interface Licenca {
   id: string; tipo: string | null; key: string | null; ativa: boolean
   expira_em: string; hwid: string | null; statusHwid: string; ultimo_acesso: string | null
+  hwid_reset_count: number; spoofSuspeito: boolean; hwidsDistintos24h: number
   usuarios: { nome: string; sobrenome: string; email: string }
 }
 interface IpSuspeito { ip: string; totalUsuarios: number }
@@ -614,7 +615,7 @@ export default function AdminDashboard() {
               <div style={{ background: '#111826', border: '1px solid #1E2939', borderRadius: '12px', overflow: 'auto' }}>
                 <table style={{ width: '100%', borderCollapse: 'collapse', minWidth: '900px' }}>
                   <thead><tr style={{ background: '#151D2C' }}>
-                    {['Usuário', 'Tipo', 'Key', 'Expira', 'HWID', 'Status', 'Ações'].map(h => (
+                    {['Usuário', 'Tipo', 'Key', 'Expira', 'HWID', 'Resets', 'Status', 'Ações'].map(h => (
                       <th key={h} style={{ padding: '10px 14px', textAlign: 'left', fontSize: '11px', color: '#647489', fontWeight: '600' }}>{h}</th>
                     ))}
                   </tr></thead>
@@ -623,10 +624,17 @@ export default function AdminDashboard() {
                       const u = l.usuarios
                       const expirou = new Date(l.expira_em) < new Date()
                       return (
-                        <tr key={l.id} style={{ borderTop: '1px solid #1E2939' }}>
+                        <tr key={l.id} style={{ borderTop: '1px solid #1E2939', background: l.spoofSuspeito ? 'rgba(239,68,68,0.04)' : 'transparent' }}>
                           <td style={{ padding: '10px 14px' }}>
-                            <p style={{ fontSize: '13px', fontWeight: '600' }}>{u?.nome} {u?.sobrenome}</p>
-                            <p style={{ fontSize: '11px', color: '#647489' }}>{u?.email}</p>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                              {l.spoofSuspeito && (
+                                <span title={`${l.hwidsDistintos24h} HWIDs distintos nas últimas 24h — possível sharing`} style={{ fontSize: '14px', cursor: 'help' }}>⚠️</span>
+                              )}
+                              <div>
+                                <p style={{ fontSize: '13px', fontWeight: '600' }}>{u?.nome} {u?.sobrenome}</p>
+                                <p style={{ fontSize: '11px', color: '#647489' }}>{u?.email}</p>
+                              </div>
+                            </div>
                           </td>
                           <td style={{ padding: '10px 14px', fontSize: '12px', color: '#647489' }}>
                             {!l.tipo ? '⏳ Pendente' : l.tipo === 'key' ? '🔑 Key' : '👤 U/S'}
@@ -641,6 +649,16 @@ export default function AdminDashboard() {
                           <td style={{ padding: '10px 14px' }}>
                             <span style={{ fontSize: '11px', padding: '2px 6px', borderRadius: '999px', background: l.statusHwid === 'ativado' ? 'rgba(34,197,94,0.1)' : 'rgba(251,191,36,0.1)', color: l.statusHwid === 'ativado' ? '#22C55E' : '#FBBF24' }}>
                               {l.statusHwid === 'ativado' ? '✅ Ativado' : '⏳ Pendente'}
+                            </span>
+                          </td>
+                          <td style={{ padding: '10px 14px', textAlign: 'center' }}>
+                            <span title="Total de resets de HWID realizados" style={{
+                              fontSize: '12px', fontWeight: '700', fontFamily: 'monospace',
+                              color: l.hwid_reset_count === 0 ? '#647489' : l.hwid_reset_count >= 3 ? '#EF4444' : '#FBBF24',
+                              background: l.hwid_reset_count >= 3 ? 'rgba(239,68,68,0.1)' : l.hwid_reset_count > 0 ? 'rgba(251,191,36,0.08)' : 'transparent',
+                              padding: '2px 8px', borderRadius: '999px',
+                            }}>
+                              {l.hwid_reset_count}x
                             </span>
                           </td>
                           <td style={{ padding: '10px 14px' }}>
@@ -663,7 +681,7 @@ export default function AdminDashboard() {
                       )
                     })}
                     {licencas.length === 0 && (
-                      <tr><td colSpan={7} style={{ padding: '24px', textAlign: 'center', color: '#647489', fontSize: '13px' }}>Nenhuma licença encontrada.</td></tr>
+                      <tr><td colSpan={8} style={{ padding: '24px', textAlign: 'center', color: '#647489', fontSize: '13px' }}>Nenhuma licença encontrada.</td></tr>
                     )}
                   </tbody>
                 </table>
