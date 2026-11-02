@@ -16,7 +16,9 @@ export default function NavBar() {
   const [user, setUser] = useState<UserData>({ logado: false })
   const [dropdown, setDropdown] = useState(false)
   const [banner, setBanner] = useState(false)
+  const [totalNaoLidas, setTotalNaoLidas] = useState(0)
   const dropRef = useRef<HTMLDivElement>(null)
+  const notifIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null)
 
   useEffect(() => {
     fetch('/api/auth/me', { credentials: 'include' })
@@ -26,10 +28,23 @@ export default function NavBar() {
         if (d.logado) {
           const jaViu = sessionStorage.getItem('banner_visto')
           if (!jaViu) setBanner(true)
+          // Inicia polling de notificações
+          pollarNotificacoes()
+          notifIntervalRef.current = setInterval(pollarNotificacoes, 10_000)
         }
       })
       .catch(() => {})
+    return () => { if (notifIntervalRef.current) clearInterval(notifIntervalRef.current) }
   }, [])
+
+  async function pollarNotificacoes() {
+    try {
+      const r = await fetch('/api/notificacoes', { credentials: 'include' })
+      if (!r.ok) return
+      const d = await r.json()
+      setTotalNaoLidas(d.total_nao_lidas || 0)
+    } catch {}
+  }
 
   // Fecha dropdown ao clicar fora
   useEffect(() => {
@@ -119,6 +134,18 @@ export default function NavBar() {
                         onMouseEnter={e => (e.currentTarget.style.background = '#151D2C')}
                         onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}>
                         📦 Minhas Compras
+                      </Link>
+                      <Link href="/notificacoes" onClick={() => setDropdown(false)} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '10px 12px', borderRadius: '8px', textDecoration: 'none', color: '#F1F5FA', fontSize: '14px' }}
+                        onMouseEnter={e => (e.currentTarget.style.background = '#151D2C')}
+                        onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}>
+                        <span style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                          🔔 Notificações
+                        </span>
+                        {totalNaoLidas > 0 && (
+                          <span style={{ background: '#EF4444', color: '#fff', borderRadius: '999px', padding: '1px 7px', fontSize: '11px', fontWeight: '800' }}>
+                            {totalNaoLidas}
+                          </span>
+                        )}
                       </Link>
                     </div>
                     <div style={{ borderTop: '1px solid #1E2939', padding: '6px' }}>

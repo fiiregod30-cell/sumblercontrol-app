@@ -31,9 +31,17 @@ export async function GET(req: NextRequest) {
 
 export async function POST(req: NextRequest) {
   try {
-    // Rate limit: 3 tickets por IP a cada 10 minutos
-    const ip = req.headers.get('x-forwarded-for')?.split(',')[0]?.trim() || 'unknown'
-    const rl = rateLimit(`ticket:${ip}`, 3, 600_000)
+    // Auth obrigatória — apenas usuários cadastrados e logados
+    const token = req.cookies.get('sc_token')?.value
+    if (!token)
+      return NextResponse.json({ error: 'Você precisa estar logado para abrir um ticket.', authRequired: true }, { status: 401 })
+
+    const payload = verifyToken(token)
+    if (!payload || payload.role !== 'user')
+      return NextResponse.json({ error: 'Token inválido.', authRequired: true }, { status: 401 })
+
+    // Rate limit: 3 tickets por usuário a cada 10 minutos
+    const rl = rateLimit(`ticket:${payload.id}`, 3, 600_000)
     if (!rl.allowed) {
       return NextResponse.json(
         { error: 'Muitos tickets enviados. Aguarde alguns minutos.' },
@@ -41,10 +49,10 @@ export async function POST(req: NextRequest) {
       )
     }
 
-    const { nome, email, assunto, mensagem } = await req.json()
+    const { assunto, mensagem } = await req.json()
 
-    if (!nome || !email || !assunto || !mensagem) {
-      return NextResponse.json({ error: 'Todos os campos são obrigatórios.' }, { status: 400 })
+    if (!assunto || !mensagem) {
+      return NextResponse.json({ error: 'Assunto e mensagem são obrigatórios.' }, { status: 400 })
     }
     if (mensagem.trim().length < 10) {
       return NextResponse.json({ error: 'Descreva melhor sua dúvida (mín. 10 caracteres).' }, { status: 400 })
@@ -53,29 +61,43 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'Mensagem muito longa (máx. 2000 caracteres).' }, { status: 400 })
     }
 
-    // Verifica se o e-mail pertence a um usuário cadastrado
+    // Busca nome e email do usuário logado diretamente — não aceita do body
     const { data: usuario } = await supabaseAdmin
       .from('usuarios')
-      .select('id')
-      .eq('email', email.toLowerCase())
+      .select('id, nome, sobrenome, email')
+      .eq('id', payload.id)
       .single()
+
+    if (!usuario) return NextResponse.json({ error: 'Usuário não encontrado.' }, { status: 404 })
 
     const { data: ticket } = await supabaseAdmin
       .from('tickets')
       .insert({
-        nome: nome.trim(),
-        email: email.toLowerCase().trim(),
-        usuario_id: usuario?.id || null,
+        nome: `${usuario.nome} ${usuario.sobrenome}`.trim(),
+        email: usuario.email,
+        usuario_id: usuario.id,
         assunto,
         mensagem: mensagem.trim(),
       })
       .select('id')
       .single()
 
+    // Registra primeira mensagem no histórico de conversa
+    if (ticket?.id) {
+      await supabaseAdmin
+        .from('ticket_mensagens')
+        .insert({
+          ticket_id: ticket.id,
+          remetente: 'usuario',
+          mensagem: mensagem.trim(),
+          lida: false,
+        })
+    }
+
     return NextResponse.json({
       ok: true,
       ticketId: ticket?.id,
-      mensagem: 'Ticket criado com sucesso! Retornaremos por e-mail em até 24h úteis.',
+      mensagem: 'Ticket criado com sucesso! Você será notificado quando respondermos.',
     })
   } catch {
     return NextResponse.json({ error: 'Erro interno.' }, { status: 500 })
