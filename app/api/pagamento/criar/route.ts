@@ -39,10 +39,10 @@ export async function POST(req: NextRequest) {
       await supabaseAdmin.from('pedidos').update({ status: 'cancelado' }).eq('id', pedidoPendente.id)
     }
 
-    // Busca configurações do banco — preço correto por plano + link de download
+    // Busca configurações do banco — preço correto por plano
     const { data: cfgData } = await supabaseAdmin
       .from('config_site')
-      .select('preco, preco_semestral, preco_anual, link_download')
+      .select('preco, preco_semestral, preco_anual')
       .eq('id', 1)
       .single()
 
@@ -50,9 +50,6 @@ export async function POST(req: NextRequest) {
     let valorOriginal = cfgData?.preco ?? 31.99
     if (plano === 'semestral') valorOriginal = cfgData?.preco_semestral ?? 134.90
     if (plano === 'anual')     valorOriginal = cfgData?.preco_anual    ?? 289.90
-
-    // Link de download sempre do banco (admin pode atualizar)
-    const linkDownload = cfgData?.link_download || process.env.DOWNLOAD_LINK || ''
 
     // Label do plano para descrição do PIX
     const planoLabel = plano === 'semestral' ? 'Plano Semestral' : plano === 'anual' ? 'Plano Anual' : 'Plano Mensal'
@@ -85,7 +82,6 @@ export async function POST(req: NextRequest) {
         valor_final: valorFinal,
         cupom_id: cupomUsado,
         status: 'pendente',
-        link_download: linkDownload,
         plano: plano || 'mensal',
       })
       .select('id')

@@ -12,6 +12,14 @@ interface Compra {
   plano: string | null
 }
 
+interface VersaoAtual {
+  id: string
+  numero: string
+  link: string
+  notas: string | null
+  publicadaEm: string
+}
+
 interface LicencaAtiva {
   id: string
   tipo: string | null
@@ -42,6 +50,8 @@ export default function MinhasComprasPage() {
   const [loading, setLoading] = useState(true)
   const [copiado, setCopiado] = useState(false)
   const [copiadoPedido, setCopiadoPedido] = useState<string | null>(null)
+  const [versaoAtual, setVersaoAtual] = useState<VersaoAtual | null>(null)
+  const [versoesBaixadas, setVersoesBaixadas] = useState<Set<string>>(new Set())
 
   useEffect(() => {
     fetch('/api/auth/me', { credentials: 'include' })
@@ -66,6 +76,12 @@ export default function MinhasComprasPage() {
     fetch('/api/minhas-licencas', { credentials: 'include' })
       .then(r => r.json())
       .then(d => { if (d.licencas) setLicencasPorPedido(d.licencas) })
+      .catch(() => {})
+
+    // Versão atual do produto
+    fetch('/api/versao-atual')
+      .then(r => r.json())
+      .then(d => { if (d.versao) setVersaoAtual(d.versao) })
       .catch(() => {})
   }, [router])
 
@@ -218,10 +234,30 @@ export default function MinhasComprasPage() {
                         <p style={{ fontSize: '18px', fontWeight: '800' }}>R$ {c.valor_final.toFixed(2)}</p>
                         <span style={{ padding: '3px 8px', borderRadius: '999px', fontSize: '12px', background: 'rgba(34,197,94,0.1)', color: '#22C55E' }}>✓ Pago</span>
                       </div>
-                      {c.link_download && (
-                        <a href={c.link_download} target="_blank" rel="noopener noreferrer" style={{ padding: '10px 20px', background: '#3B82F6', color: '#fff', borderRadius: '8px', textDecoration: 'none', fontSize: '14px', fontWeight: '700', whiteSpace: 'nowrap' }}>
-                          ⬇️ Baixar
-                        </a>
+                      {versaoAtual && (
+                        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: '4px' }}>
+                          {!versoesBaixadas.has(versaoAtual.id) && (
+                            <span style={{ fontSize: '11px', padding: '2px 8px', borderRadius: '999px', background: 'rgba(251,191,36,0.15)', color: '#FBBF24', fontWeight: '600', whiteSpace: 'nowrap' }}>
+                              🆕 v{versaoAtual.numero} disponível
+                            </span>
+                          )}
+                          <a
+                            href={versaoAtual.link}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            onClick={() => {
+                              fetch('/api/download/registrar', {
+                                method: 'POST',
+                                headers: { 'Content-Type': 'application/json' },
+                                credentials: 'include',
+                                body: JSON.stringify({ versaoId: versaoAtual.id }),
+                              }).then(() => setVersoesBaixadas(prev => new Set([...prev, versaoAtual.id])))
+                            }}
+                            style={{ padding: '10px 20px', background: '#3B82F6', color: '#fff', borderRadius: '8px', textDecoration: 'none', fontSize: '14px', fontWeight: '700', whiteSpace: 'nowrap' }}
+                          >
+                            ⬇️ Baixar v{versaoAtual.numero}
+                          </a>
+                        </div>
                       )}
                     </div>
                   </div>

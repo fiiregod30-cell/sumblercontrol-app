@@ -27,7 +27,7 @@ interface TicketMensagem {
 
 export default function AdminDashboard() {
   const router = useRouter()
-  const [aba, setAba] = useState<'dashboard'|'cupons'|'usuarios'|'vendas'|'configuracoes'|'licencas'|'ips'|'tickets'|'chat'>('dashboard')
+  const [aba, setAba] = useState<'dashboard'|'cupons'|'usuarios'|'vendas'|'configuracoes'|'licencas'|'ips'|'tickets'|'chat'|'versoes'>('dashboard')
   const [stats, setStats] = useState<Stats>({ usuarios: 0, vendas: 0, receita: 0 })
   const [licencas, setLicencas] = useState<Licenca[]>([])
   const [ipSuspeitos, setIpSuspeitos] = useState<IpSuspeito[]>([])
@@ -36,6 +36,14 @@ export default function AdminDashboard() {
   const [novaLicencaTipo, setNovaLicencaTipo] = useState('key')
   const [novaLicencaDias, setNovaLicencaDias] = useState('30')
   const [licencaMsg, setLicencaMsg] = useState('')
+
+  // ── Versões ──────────────────────────────────────────────
+  interface Versao { id: string; numero: string; link: string; notas: string | null; ativa: boolean; criado_em: string }
+  const [versoes, setVersoes] = useState<Versao[]>([])
+  const [novaVersaoNumero, setNovaVersaoNumero] = useState('')
+  const [novaVersaoLink, setNovaVersaoLink] = useState('')
+  const [novaVersaoNotas, setNovaVersaoNotas] = useState('')
+  const [versaoMsg, setVersaoMsg] = useState('')
   const [cupons, setCupons] = useState<Cupom[]>([])
   const [tickets, setTickets] = useState<Ticket[]>([])
   const [ticketFiltro, setTicketFiltro] = useState('todos')
@@ -95,6 +103,12 @@ export default function AdminDashboard() {
         setChatMensagens(data.mensagens || [])
         return
       }
+      if (aba === 'versoes') {
+        const res = await fetch('/api/admin/versoes', { credentials: 'include' })
+        if (res.status === 401) { router.push('/admin'); return }
+        setVersoes(await res.json())
+        return
+      }
       const res = await fetch('/api/admin/dados?tipo=' + aba, { credentials: 'include' })
       if (res.status === 401) { router.push('/admin'); return }
       const data = await res.json()
@@ -124,6 +138,38 @@ export default function AdminDashboard() {
   async function reenviarEmail(userId: string) {
     await fetch('/api/admin/reenviar', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ userId }) })
     alert('E-mail reenviado!')
+  }
+
+  async function publicarVersao(e: React.FormEvent) {
+    e.preventDefault()
+    setVersaoMsg('')
+    const res = await fetch('/api/admin/versoes', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      credentials: 'include',
+      body: JSON.stringify({ numero: novaVersaoNumero, link: novaVersaoLink, notas: novaVersaoNotas }),
+    })
+    const data = await res.json()
+    if (res.ok) {
+      setVersaoMsg('✓ Versão publicada com sucesso!')
+      setNovaVersaoNumero('')
+      setNovaVersaoLink('')
+      setNovaVersaoNotas('')
+      carregarDados()
+    } else {
+      setVersaoMsg('✗ ' + data.error)
+    }
+  }
+
+  async function reativarVersao(versaoId: string) {
+    if (!confirm('Reativar esta versão? A versão atual será desativada.')) return
+    await fetch('/api/admin/versoes', {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      credentials: 'include',
+      body: JSON.stringify({ versaoId }),
+    })
+    carregarDados()
   }
 
   async function resetarHwid(licencaId: string) {
@@ -266,6 +312,7 @@ export default function AdminDashboard() {
     { id: 'usuarios', label: '👥 Usuários' },
     { id: 'vendas', label: '💰 Vendas' },
     { id: 'licencas', label: '🔑 Licenças' },
+    { id: 'versoes', label: '📦 Versões' },
     { id: 'ips', label: '🌐 IPs' },
     { id: 'tickets', label: '🎫 Tickets' },
     { id: 'chat', label: '💬 Chat' },
@@ -682,6 +729,104 @@ export default function AdminDashboard() {
                     })}
                     {licencas.length === 0 && (
                       <tr><td colSpan={8} style={{ padding: '24px', textAlign: 'center', color: '#647489', fontSize: '13px' }}>Nenhuma licença encontrada.</td></tr>
+                    )}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          )}
+
+          {/* Versões */}
+          {aba === 'versoes' && (
+            <div>
+              <h2 style={{ fontSize: '20px', fontWeight: '800', marginBottom: '24px' }}>📦 Versões do Produto</h2>
+
+              {/* Formulário de nova versão */}
+              <div style={{ background: '#111826', border: '1px solid #1E2939', borderRadius: '12px', padding: '20px', marginBottom: '24px' }}>
+                <h3 style={{ fontSize: '14px', fontWeight: '700', marginBottom: '16px', color: '#F1F5FA' }}>Publicar Nova Versão</h3>
+                <form onSubmit={publicarVersao} style={{ display: 'flex', gap: '12px', flexWrap: 'wrap', alignItems: 'flex-end' }}>
+                  <div>
+                    <label style={{ fontSize: '11px', color: '#647489', display: 'block', marginBottom: '4px' }}>Número da versão</label>
+                    <input
+                      value={novaVersaoNumero}
+                      onChange={e => setNovaVersaoNumero(e.target.value)}
+                      placeholder="ex: 1.1.0"
+                      required
+                      style={{ padding: '8px 12px', background: '#0D1420', border: '1px solid #243044', borderRadius: '8px', color: '#F1F5FA', fontSize: '13px', width: '120px' }}
+                    />
+                  </div>
+                  <div style={{ flex: 1, minWidth: '260px' }}>
+                    <label style={{ fontSize: '11px', color: '#647489', display: 'block', marginBottom: '4px' }}>Link de download</label>
+                    <input
+                      value={novaVersaoLink}
+                      onChange={e => setNovaVersaoLink(e.target.value)}
+                      placeholder="https://..."
+                      required
+                      style={{ padding: '8px 12px', background: '#0D1420', border: '1px solid #243044', borderRadius: '8px', color: '#F1F5FA', fontSize: '13px', width: '100%' }}
+                    />
+                  </div>
+                  <div style={{ flex: 1, minWidth: '200px' }}>
+                    <label style={{ fontSize: '11px', color: '#647489', display: 'block', marginBottom: '4px' }}>Notas (opcional)</label>
+                    <input
+                      value={novaVersaoNotas}
+                      onChange={e => setNovaVersaoNotas(e.target.value)}
+                      placeholder="O que mudou nesta versão..."
+                      style={{ padding: '8px 12px', background: '#0D1420', border: '1px solid #243044', borderRadius: '8px', color: '#F1F5FA', fontSize: '13px', width: '100%' }}
+                    />
+                  </div>
+                  <button type="submit" style={{ padding: '9px 20px', background: '#3B82F6', color: '#fff', border: 'none', borderRadius: '8px', fontSize: '13px', fontWeight: '700', cursor: 'pointer', whiteSpace: 'nowrap' }}>
+                    🚀 Publicar
+                  </button>
+                </form>
+                {versaoMsg && (
+                  <p style={{ marginTop: '10px', fontSize: '13px', color: versaoMsg.startsWith('✓') ? '#22C55E' : '#EF4444' }}>{versaoMsg}</p>
+                )}
+              </div>
+
+              {/* Lista de versões */}
+              <div style={{ background: '#111826', border: '1px solid #1E2939', borderRadius: '12px', overflow: 'hidden' }}>
+                <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+                  <thead>
+                    <tr style={{ background: '#151D2C' }}>
+                      {['Versão', 'Link', 'Notas', 'Publicada em', 'Status', 'Ação'].map(h => (
+                        <th key={h} style={{ padding: '12px 16px', textAlign: 'left', fontSize: '11px', color: '#647489', fontWeight: '600' }}>{h}</th>
+                      ))}
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {versoes.map(v => (
+                      <tr key={v.id} style={{ borderTop: '1px solid #1E2939', background: v.ativa ? 'rgba(34,197,94,0.03)' : 'transparent' }}>
+                        <td style={{ padding: '12px 16px', fontFamily: 'monospace', fontSize: '14px', fontWeight: '700', color: v.ativa ? '#22C55E' : '#F1F5FA' }}>
+                          v{v.numero}
+                        </td>
+                        <td style={{ padding: '12px 16px', maxWidth: '200px' }}>
+                          <a href={v.link} target="_blank" rel="noopener noreferrer" style={{ fontSize: '12px', color: '#3B82F6', textDecoration: 'none', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', display: 'block' }}>
+                            {v.link}
+                          </a>
+                        </td>
+                        <td style={{ padding: '12px 16px', fontSize: '12px', color: '#647489', maxWidth: '200px' }}>
+                          {v.notas || <span style={{ color: '#2A3A55' }}>—</span>}
+                        </td>
+                        <td style={{ padding: '12px 16px', fontSize: '12px', color: '#647489', whiteSpace: 'nowrap' }}>
+                          {new Date(v.criado_em).toLocaleDateString('pt-BR')}
+                        </td>
+                        <td style={{ padding: '12px 16px' }}>
+                          {v.ativa
+                            ? <span style={{ fontSize: '11px', padding: '2px 8px', borderRadius: '999px', background: 'rgba(34,197,94,0.1)', color: '#22C55E', fontWeight: '600' }}>✅ Ativa</span>
+                            : <span style={{ fontSize: '11px', padding: '2px 8px', borderRadius: '999px', background: 'rgba(100,116,137,0.1)', color: '#647489' }}>Inativa</span>
+                          }
+                        </td>
+                        <td style={{ padding: '12px 16px' }}>
+                          {!v.ativa && (
+                            <button onClick={() => reativarVersao(v.id)} style={{ padding: '4px 10px', background: '#151D2C', border: '1px solid #243044', borderRadius: '6px', color: '#FBBF24', fontSize: '12px', cursor: 'pointer' }}>
+                              Reativar
+                            </button>
+                          )}
+                        </td>
+                      </tr>
+                    ))}
+                    {versoes.length === 0 && (
+                      <tr><td colSpan={6} style={{ padding: '24px', textAlign: 'center', color: '#647489', fontSize: '13px' }}>Nenhuma versão publicada ainda.</td></tr>
                     )}
                   </tbody>
                 </table>
