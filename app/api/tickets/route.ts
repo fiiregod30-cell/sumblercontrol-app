@@ -18,7 +18,7 @@ export async function GET(req: NextRequest) {
 
   let query = supabaseAdmin
     .from('tickets')
-    .select('id, nome, email, assunto, status, criado_em, respondido_em, usuario_id')
+    .select('id, nome, email, assunto, mensagem, status, resposta_admin, criado_em, respondido_em, usuario_id')
     .order('criado_em', { ascending: false })
 
   if (status && status !== 'todos') {
