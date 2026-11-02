@@ -40,28 +40,68 @@ export async function POST(req: NextRequest) {
     if (!payload || payload.role !== 'user')
       return NextResponse.json({ error: 'Token inválido.', authRequired: true }, { status: 401 })
 
-    // Rate limit: 3 tickets por usuário a cada 10 minutos
-    const rl = rateLimit(`ticket:${payload.id}`, 3, 600_000)
-    if (!rl.allowed) {
-      return NextResponse.json(
-        { error: 'Muitos tickets enviados. Aguarde alguns minutos.' },
-        { status: 429 }
-      )
-    }
-
     const { assunto, mensagem } = await req.json()
 
-    if (!assunto || !mensagem) {
+    if (!assunto || !mensagem)
       return NextResponse.json({ error: 'Assunto e mensagem são obrigatórios.' }, { status: 400 })
-    }
-    if (mensagem.trim().length < 10) {
+    if (mensagem.trim().length < 10)
       return NextResponse.json({ error: 'Descreva melhor sua dúvida (mín. 10 caracteres).' }, { status: 400 })
-    }
-    if (mensagem.trim().length > 2000) {
+    if (mensagem.trim().length > 2000)
       return NextResponse.json({ error: 'Mensagem muito longa (máx. 2000 caracteres).' }, { status: 400 })
+
+    // ── Busca tickets existentes do usuário ──────────────────────────────────
+    const { data: ticketsExistentes } = await supabaseAdmin
+      .from('tickets')
+      .select('id, assunto, status, criado_em')
+      .eq('usuario_id', payload.id)
+      .order('criado_em', { ascending: false })
+
+    const agora = Date.now()
+    const COOLDOWN_MS = 15 * 60 * 1000 // 15 minutos
+
+    // ── B: Cooldown de 15 minutos entre tickets ──────────────────────────────
+    if (ticketsExistentes && ticketsExistentes.length > 0) {
+      const ultimoTicket = ticketsExistentes[0]
+      const criadoEm = new Date(ultimoTicket.criado_em).getTime()
+      const diff = agora - criadoEm
+
+      if (diff < COOLDOWN_MS) {
+        const restanteSeg = Math.ceil((COOLDOWN_MS - diff) / 1000)
+        const restanteMin = Math.ceil(restanteSeg / 60)
+        return NextResponse.json({
+          error: `Aguarde ${restanteMin} minuto${restanteMin > 1 ? 's' : ''} para criar o próximo ticket.`,
+          cooldown: true,
+          restanteSeg,
+        }, { status: 429 })
+      }
     }
 
-    // Busca nome e email do usuário logado diretamente — não aceita do body
+    // ── A: Máximo de 2 tickets abertos/em andamento simultaneamente ──────────
+    const ticketsAbertos = (ticketsExistentes || []).filter(
+      t => t.status === 'aberto' || t.status === 'em_andamento'
+    )
+    if (ticketsAbertos.length >= 2) {
+      return NextResponse.json({
+        error: 'Você já tem 2 tickets em aberto. Aguarde a resolução antes de abrir um novo.',
+        limiteAtingido: true,
+      }, { status: 429 })
+    }
+
+    // ── C: Bloqueia assunto idêntico a ticket já aberto ──────────────────────
+    const assuntoNorm = assunto.trim().toLowerCase()
+    const duplicado = (ticketsExistentes || []).find(
+      t => (t.status === 'aberto' || t.status === 'em_andamento') &&
+           t.assunto.trim().toLowerCase() === assuntoNorm
+    )
+    if (duplicado) {
+      return NextResponse.json({
+        error: 'Você já tem um ticket aberto com esse assunto.',
+        duplicado: true,
+        ticketId: duplicado.id,
+      }, { status: 409 })
+    }
+
+    // ── Busca nome e email do usuário ────────────────────────────────────────
     const { data: usuario } = await supabaseAdmin
       .from('usuarios')
       .select('id, nome, sobrenome, email')

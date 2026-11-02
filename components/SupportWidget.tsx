@@ -57,6 +57,11 @@ export default function SupportWidget() {
   const [ticketMsg, setTicketMsg] = useState('')
   const [ticketSucesso, setTicketSucesso] = useState(false)
   const [ticketId, setTicketId] = useState<string | null>(null)
+  // Cooldown: segundos restantes + intervalo do contador
+  const [cooldownSeg, setCooldownSeg] = useState(0)
+  const cooldownRef = useRef<ReturnType<typeof setInterval> | null>(null)
+  // Duplicado: id do ticket existente com mesmo assunto
+  const [ticketDuplicadoId, setTicketDuplicadoId] = useState<string | null>(null)
 
   // ── Inicialização ────────────────────────────────────────────────────────────
 
@@ -203,6 +208,7 @@ export default function SupportWidget() {
     if (!mensagemTicket.trim() || !assunto) { setTicketMsg('Preencha todos os campos.'); return }
     setTicketEnviando(true)
     setTicketMsg('')
+    setTicketDuplicadoId(null)
 
     try {
       const r = await fetch('/api/tickets', {
@@ -214,8 +220,29 @@ export default function SupportWidget() {
       const d = await r.json()
       if (!r.ok) {
         if (d.authRequired) {
-          // Redireciona para login
           router.push('/login')
+          return
+        }
+        // Cooldown: inicia contador regressivo
+        if (d.cooldown && d.restanteSeg) {
+          setCooldownSeg(d.restanteSeg)
+          if (cooldownRef.current) clearInterval(cooldownRef.current)
+          cooldownRef.current = setInterval(() => {
+            setCooldownSeg(prev => {
+              if (prev <= 1) {
+                if (cooldownRef.current) clearInterval(cooldownRef.current)
+                return 0
+              }
+              return prev - 1
+            })
+          }, 1000)
+          setTicketEnviando(false)
+          return
+        }
+        // Duplicado: mostra link para o ticket existente
+        if (d.duplicado && d.ticketId) {
+          setTicketDuplicadoId(d.ticketId)
+          setTicketEnviando(false)
           return
         }
         setTicketMsg(d.error || 'Erro ao enviar ticket.')
@@ -401,7 +428,49 @@ export default function SupportWidget() {
               {/* Usuário logado — formulário */}
               {usuarioLogado && !ticketSucesso && (
                 <>
-                  <p style={{ fontSize: '12px', color: '#647489', margin: 0 }}>Fale com nossa equipe. Respondemos em até 24h.</p>
+                  {/* Cooldown ativo — contador regressivo */}
+                  {cooldownSeg > 0 ? (
+                    <div style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: '14px', padding: '16px', textAlign: 'center' }}>
+                      <div style={{ fontSize: '36px' }}>⏳</div>
+                      <p style={{ fontSize: '14px', fontWeight: '700', color: '#FBBF24', margin: 0 }}>
+                        Aguarde para criar o próximo ticket
+                      </p>
+                      <div style={{ background: 'rgba(251,191,36,0.08)', border: '1px solid rgba(251,191,36,0.2)', borderRadius: '10px', padding: '14px 20px' }}>
+                        <p style={{ fontSize: '28px', fontWeight: '900', color: '#FBBF24', margin: '0 0 4px', fontVariantNumeric: 'tabular-nums' }}>
+                          {Math.floor(cooldownSeg / 60).toString().padStart(2, '0')}:{(cooldownSeg % 60).toString().padStart(2, '0')}
+                        </p>
+                        <p style={{ fontSize: '12px', color: '#647489', margin: 0 }}>minutos restantes</p>
+                      </div>
+                      <p style={{ fontSize: '12px', color: '#647489', margin: 0, lineHeight: 1.6 }}>
+                        Para evitar spam, existe um intervalo de 15 minutos entre a criação de tickets.
+                      </p>
+                    </div>
+                  ) : ticketDuplicadoId ? (
+                    /* Duplicado — ticket com mesmo assunto já existe */
+                    <div style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: '14px', padding: '16px', textAlign: 'center' }}>
+                      <div style={{ fontSize: '36px' }}>🔁</div>
+                      <p style={{ fontSize: '14px', fontWeight: '700', color: '#F1F5FA', margin: 0 }}>
+                        Ticket já existe
+                      </p>
+                      <p style={{ fontSize: '13px', color: '#647489', margin: 0, lineHeight: 1.6 }}>
+                        Você já tem um ticket aberto com esse assunto. Acesse-o para continuar a conversa.
+                      </p>
+                      <div style={{ display: 'flex', gap: '8px', width: '100%' }}>
+                        <button
+                          onClick={() => { setTicketDuplicadoId(null); setTicketMsg('') }}
+                          style={{ flex: 1, padding: '9px', background: 'transparent', border: '1px solid #243044', borderRadius: '8px', color: '#647489', fontSize: '13px', cursor: 'pointer' }}>
+                          Voltar
+                        </button>
+                        <a
+                          href={`/notificacoes/${ticketDuplicadoId}`}
+                          style={{ flex: 1, padding: '9px', background: '#3B82F6', borderRadius: '8px', color: '#fff', fontSize: '13px', fontWeight: '600', textDecoration: 'none', textAlign: 'center' }}>
+                          Ver ticket →
+                        </a>
+                      </div>
+                    </div>
+                  ) : (
+                    <>
+                    <p style={{ fontSize: '12px', color: '#647489', margin: 0 }}>Fale com nossa equipe. Respondemos em até 24h.</p>
 
                   <select
                     value={assunto}
@@ -431,6 +500,8 @@ export default function SupportWidget() {
                     onMouseLeave={e => (e.currentTarget.style.color = '#647489')}>
                     🔔 Ver meus tickets e notificações →
                   </a>
+                  </>
+                )}
                 </>
               )}
 
