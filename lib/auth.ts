@@ -1,7 +1,8 @@
 import jwt from 'jsonwebtoken'
 import bcrypt from 'bcryptjs'
 
-const JWT_SECRET = process.env.ADMIN_SECRET_KEY || 'sumblercontrol-secret-2026'
+const JWT_SECRET = process.env.ADMIN_SECRET_KEY
+if (!JWT_SECRET) throw new Error('[auth] ADMIN_SECRET_KEY não está definida nas variáveis de ambiente')
 const JWT_EXPIRES = '7d'
 
 // ── Hash de senha ────────────────────────────────────────────

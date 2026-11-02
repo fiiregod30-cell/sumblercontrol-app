@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { supabaseAdmin } from '@/lib/supabase'
 import { sendDownloadEmail } from '@/lib/email'
 import { getPaymentStatus } from '@/lib/mercadopago'
+import crypto from 'crypto'
 
 function getIP(req: NextRequest): string {
   return req.headers.get('x-forwarded-for')?.split(',')[0]?.trim()
@@ -9,9 +10,50 @@ function getIP(req: NextRequest): string {
       || 'unknown'
 }
 
+function verifyWebhookSignature(req: NextRequest, rawBody: string): boolean {
+  const secret = process.env.MP_WEBHOOK_SECRET
+  if (!secret) return false
+
+  // Formato do header: ts=<timestamp>,v1=<hmac>
+  const signatureHeader = req.headers.get('x-signature') || ''
+  const tsMatch = signatureHeader.match(/ts=([^,]+)/)
+  const v1Match = signatureHeader.match(/v1=([^,]+)/)
+
+  if (!tsMatch || !v1Match) return false
+
+  const ts = tsMatch[1]
+  const receivedHmac = v1Match[1]
+
+  // Payload que o MP assina: id:<payment_id>;request-id:<request_id>;ts:<timestamp>
+  const requestId = req.headers.get('x-request-id') || ''
+  let paymentId = ''
+  try {
+    const body = JSON.parse(rawBody)
+    paymentId = body?.data?.id?.toString() || ''
+  } catch { return false }
+
+  const manifest = `id:${paymentId};request-id:${requestId};ts:${ts}`
+  const expectedHmac = crypto
+    .createHmac('sha256', secret)
+    .update(manifest)
+    .digest('hex')
+
+  return crypto.timingSafeEqual(
+    Buffer.from(receivedHmac, 'hex'),
+    Buffer.from(expectedHmac, 'hex')
+  )
+}
+
 export async function POST(req: NextRequest) {
   try {
-    const body = await req.json()
+    const rawBody = await req.text()
+
+    // Valida assinatura do Mercado Pago
+    if (!verifyWebhookSignature(req, rawBody)) {
+      return NextResponse.json({ error: 'Assinatura inválida' }, { status: 401 })
+    }
+
+    const body = JSON.parse(rawBody)
     const ip = getIP(req)
 
     if (body.type !== 'payment') {

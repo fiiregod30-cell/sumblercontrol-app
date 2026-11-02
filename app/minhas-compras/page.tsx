@@ -23,7 +23,6 @@ export default function MinhasComprasPage() {
   const [nomeCompleto, setNomeCompleto] = useState('')
   const [licenca, setLicenca] = useState<LicencaInfo | null>(null)
   const [loading, setLoading] = useState(true)
-  const [linkDownload, setLinkDownload] = useState('')
 
   useEffect(() => {
     fetch('/api/auth/me', { credentials: 'include' })
@@ -47,12 +46,6 @@ export default function MinhasComprasPage() {
     fetch('/api/minha-licenca', { credentials: 'include' })
       .then(r => r.json())
       .then(d => { if (d.licenca) setLicenca(d.licenca) })
-      .catch(() => {})
-
-    // Busca o link de download sempre ao vivo do banco
-    fetch('/api/config-publica')
-      .then(r => r.json())
-      .then(d => { if (d.linkDownload) setLinkDownload(d.linkDownload) })
       .catch(() => {})
   }, [router])
 
@@ -121,8 +114,8 @@ export default function MinhasComprasPage() {
                     <p style={{ fontSize: '18px', fontWeight: '800' }}>R$ {c.valor_final.toFixed(2)}</p>
                     <span style={{ padding: '3px 8px', borderRadius: '999px', fontSize: '12px', background: 'rgba(34,197,94,0.1)', color: '#22C55E' }}>✓ Pago</span>
                   </div>
-                  {linkDownload && (
-                    <a href={linkDownload} target="_blank" rel="noopener noreferrer" style={{ padding: '10px 20px', background: '#3B82F6', color: '#fff', borderRadius: '8px', textDecoration: 'none', fontSize: '14px', fontWeight: '700', whiteSpace: 'nowrap' }}>
+                  {c.link_download && (
+                    <a href={c.link_download} target="_blank" rel="noopener noreferrer" style={{ padding: '10px 20px', background: '#3B82F6', color: '#fff', borderRadius: '8px', textDecoration: 'none', fontSize: '14px', fontWeight: '700', whiteSpace: 'nowrap' }}>
                       ⬇️ Baixar
                     </a>
                   )}
