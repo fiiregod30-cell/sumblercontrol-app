@@ -1,5 +1,5 @@
 'use client'
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, useRef } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import NavBar from '@/components/NavBar'
@@ -87,9 +87,11 @@ export default function SuportePage() {
   const [removendoIds, setRemovendoIds] = useState<Set<string>>(new Set())
   const [limpando, setLimpando] = useState(false)
 
+  const pollingRef = useRef<ReturnType<typeof setInterval> | null>(null)
+
   // ── Carga inicial ──────────────────────────────────────────────────────────
 
-  const carregarTudo = useCallback(async () => {
+  const carregarTudo = useCallback(async (silencioso = false) => {
     try {
       const [ticketsRes, notifRes] = await Promise.all([
         fetch('/api/tickets/meus', { credentials: 'include' }),
@@ -110,7 +112,7 @@ export default function SuportePage() {
       setNotificacoes(notifData.notificacoes || [])
       setTotalNaoLidas(notifData.total_nao_lidas || 0)
     } catch {}
-    setLoading(false)
+    if (!silencioso) setLoading(false)
   }, [router])
 
   useEffect(() => {
@@ -118,7 +120,12 @@ export default function SuportePage() {
       .then(r => r.json())
       .then(d => { if (!d.logado) router.push('/login') })
       .catch(() => router.push('/login'))
+
     carregarTudo()
+
+    // Polling de 5s — atualiza tickets e notificações em tempo real
+    pollingRef.current = setInterval(() => carregarTudo(true), 5_000)
+    return () => { if (pollingRef.current) clearInterval(pollingRef.current) }
   }, [carregarTudo, router])
 
   // Marca notificações como lidas ao entrar na página
