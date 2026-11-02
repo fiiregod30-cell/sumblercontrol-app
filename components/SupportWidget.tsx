@@ -1,5 +1,6 @@
 'use client'
 import { useState, useEffect, useRef } from 'react'
+import { usePathname } from 'next/navigation'
 
 interface Mensagem {
   id: string
@@ -28,6 +29,7 @@ const ASSUNTOS = [
 ]
 
 export default function SupportWidget() {
+  const pathname = usePathname()
   const [aberto, setAberto] = useState(false)
   const [aba, setAba] = useState<'chat' | 'ticket'>('chat')
   const [mensagens, setMensagens] = useState<Mensagem[]>([])
@@ -52,6 +54,11 @@ export default function SupportWidget() {
       .then(d => { if (d.discordUrl) setDiscordUrl(d.discordUrl) })
       .catch(() => {})
   }, [])
+
+  // Re-verifica status toda vez que a rota muda (troca de conta, logout, navegação)
+  useEffect(() => {
+    verificarStatus()
+  }, [pathname])
 
   // Re-verifica ao abrir — captura login recente
   useEffect(() => {
