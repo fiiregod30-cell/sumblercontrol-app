@@ -13,13 +13,15 @@ function checkAdmin(req: NextRequest) {
   return payload
 }
 
-export async function GET(req: NextRequest, { params }: { params: { id: string } }) {
+export async function GET(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   if (!checkAdmin(req)) return NextResponse.json({ error: 'Acesso negado.' }, { status: 403 })
+
+  const { id } = await params
 
   const { data: ticket } = await supabaseAdmin
     .from('tickets')
     .select('*')
-    .eq('id', params.id)
+    .eq('id', id)
     .single()
 
   if (!ticket) return NextResponse.json({ error: 'Ticket não encontrado.' }, { status: 404 })
@@ -27,9 +29,10 @@ export async function GET(req: NextRequest, { params }: { params: { id: string }
   return NextResponse.json({ ticket })
 }
 
-export async function PATCH(req: NextRequest, { params }: { params: { id: string } }) {
+export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   if (!checkAdmin(req)) return NextResponse.json({ error: 'Acesso negado.' }, { status: 403 })
 
+  const { id } = await params
   const { status, resposta_admin } = await req.json()
 
   const updates: Record<string, unknown> = {}
@@ -43,7 +46,7 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
   const { data } = await supabaseAdmin
     .from('tickets')
     .update(updates)
-    .eq('id', params.id)
+    .eq('id', id)
     .select()
     .single()
 
