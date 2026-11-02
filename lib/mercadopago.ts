@@ -19,6 +19,7 @@ export interface CreatePixPaymentParams {
 }
 
 export async function createPixPayment(params: CreatePixPaymentParams) {
+  const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || ''
   const payment = await paymentClient.create({
     body: {
       transaction_amount: params.amount,
@@ -31,6 +32,7 @@ export async function createPixPayment(params: CreatePixPaymentParams) {
       },
       external_reference: params.externalRef,
       date_of_expiration: new Date(Date.now() + 30 * 60 * 1000).toISOString(), // 30 min
+      notification_url: `${siteUrl}/api/webhook`, // garante que o MP sempre chama o webhook correto
     }
   })
 
