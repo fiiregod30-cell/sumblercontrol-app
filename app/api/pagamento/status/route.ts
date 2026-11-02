@@ -4,6 +4,16 @@ import { verifyToken } from '@/lib/auth'
 import { getPaymentStatus } from '@/lib/mercadopago'
 import { sendDownloadEmail } from '@/lib/email'
 
+// Busca o link de download da versão ativa atual
+async function getLinkDownloadAtual(): Promise<string | null> {
+  const { data } = await supabaseAdmin
+    .from('versoes')
+    .select('link')
+    .eq('ativa', true)
+    .single()
+  return data?.link || null
+}
+
 async function processarPagamentoConfirmado(pedidoId: string, usuarioId: string) {
   try {
     console.log('[STATUS-FALLBACK] Processando:', pedidoId)
@@ -82,7 +92,8 @@ export async function GET(req: NextRequest) {
     console.log('[STATUS] Pedido encontrado — id:', pedidoId, 'status:', pedido.status)
 
     if (pedido.status === 'pago') {
-      return NextResponse.json({ status: 'pago', linkDownload: pedido.link_download })
+      const linkDownload = await getLinkDownloadAtual()
+      return NextResponse.json({ status: 'pago', linkDownload })
     }
 
     if (pedido.status === 'pendente' && pedido.mp_payment_id) {
@@ -101,13 +112,13 @@ export async function GET(req: NextRequest) {
           if (!licExiste) {
             await processarPagamentoConfirmado(pedidoId, payload.id)
           } else {
-            // Licença já existe (webhook chegou antes) — só marca o pedido
             await supabaseAdmin
               .from('pedidos')
               .update({ status: 'pago', pago_em: new Date().toISOString() })
               .eq('id', pedidoId)
           }
-          return NextResponse.json({ status: 'pago', linkDownload: pedido.link_download })
+          const linkDownload = await getLinkDownloadAtual()
+          return NextResponse.json({ status: 'pago', linkDownload })
         }
 
         if (mpStatus === 'cancelled' || mpStatus === 'rejected') {
