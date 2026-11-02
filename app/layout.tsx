@@ -6,7 +6,7 @@ import SupportWidget from '@/components/SupportWidget'
 const inter = Inter({ subsets: ['latin'] })
 
 export const metadata: Metadata = {
-  title: 'SumblerControl — Mais FPS. Menos Gargalo.',
+  title: 'SumblerControl - Oficial | Otimização e Desempenho para PC',
   description: 'Ferramenta definitiva de otimização para gamers. Análise de gargalo, redução de input lag, benchmark completo e overlay de FPS.',
 }
 

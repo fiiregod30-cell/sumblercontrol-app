@@ -87,8 +87,8 @@ export default function NavBar() {
         <div style={{ maxWidth: '1160px', margin: '0 auto', padding: '0 24px', height: '64px', display: 'flex', alignItems: 'center', gap: '24px' }}>
           {/* Logo */}
           <Link href="/" style={{ display: 'flex', alignItems: 'center', gap: '10px', textDecoration: 'none', color: '#F1F5FA', fontWeight: '800', fontSize: '17px', flex: 1 }}>
-            <div style={{ width: '34px', height: '34px', background: 'rgba(59,130,246,0.12)', border: '1px solid rgba(59,130,246,0.3)', borderRadius: '8px', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
-              <svg width="20" height="20" viewBox="0 0 24 24" fill="none"><circle cx="12" cy="12" r="9" stroke="#3B82F6" strokeWidth="2"/><circle cx="12" cy="12" r="4" stroke="#3B82F6" strokeWidth="2"/></svg>
+            <div style={{ width: '34px', height: '34px', borderRadius: '8px', overflow: 'hidden', flexShrink: 0 }}>
+              <img src="/assets/SumblerControl.png" alt="SumblerControl" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
             </div>
             SumblerControl
           </Link>
