@@ -66,19 +66,16 @@ export default function MinhasComprasPage() {
       .then(d => { if (!d) return; setCompras(d.pedidos.filter((p: { status: string }) => p.status === 'pago')) })
       .finally(() => setLoading(false))
 
-    // Licença ativa mais recente (para o bloco do topo)
     fetch('/api/minha-licenca', { credentials: 'include' })
       .then(r => r.json())
       .then(d => { if (d.licenca) setLicencaAtiva(d.licenca) })
       .catch(() => {})
 
-    // Todas as licenças indexadas por pedido_id
     fetch('/api/minhas-licencas', { credentials: 'include' })
       .then(r => r.json())
       .then(d => { if (d.licencas) setLicencasPorPedido(d.licencas) })
       .catch(() => {})
 
-    // Versão atual do produto
     fetch('/api/versao-atual')
       .then(r => r.json())
       .then(d => { if (d.versao) setVersaoAtual(d.versao) })
@@ -86,7 +83,6 @@ export default function MinhasComprasPage() {
   }, [router])
 
   function copiarKey() {
-    // Busca a key completa no endpoint dedicado antes de copiar
     fetch('/api/minha-licenca/revelar-key', { credentials: 'include' })
       .then(r => r.json())
       .then(d => {
@@ -100,11 +96,19 @@ export default function MinhasComprasPage() {
   }
 
   function copiarKeyPedido(keyMascarada: string, pedidoId: string) {
-    // Para licenças por pedido, busca a key completa pelo id da licença
-    // Por ora copia a key mascarada (comportamento de fallback seguro)
     navigator.clipboard.writeText(keyMascarada)
     setCopiadoPedido(pedidoId)
     setTimeout(() => setCopiadoPedido(null), 2000)
+  }
+
+  function registrarDownload() {
+    if (!versaoAtual) return
+    fetch('/api/download/registrar', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      credentials: 'include',
+      body: JSON.stringify({ versaoId: versaoAtual.id }),
+    }).then(() => setVersoesBaixadas(prev => new Set([...prev, versaoAtual.id])))
   }
 
   if (loading) {
@@ -137,21 +141,31 @@ export default function MinhasComprasPage() {
           {nomeCompleto && <p style={{ color: '#647489', fontSize: '14px' }}>{nomeCompleto}</p>}
         </div>
 
-        {/* ── Licença Ativa (mais recente) ── */}
+        {/* ── Seu Acesso ── */}
         <div style={{ background: '#111826', border: '1px solid #1E2939', borderRadius: '12px', padding: '24px', marginBottom: '24px' }}>
-          <h2 style={{ fontSize: '16px', fontWeight: '700', marginBottom: '16px', color: '#647489' }}>🔑 Licença Ativa</h2>
+          <h2 style={{ fontSize: '16px', fontWeight: '700', marginBottom: '16px', color: '#647489' }}>⚡ Seu Acesso</h2>
 
+          {/* Estado 1: sem compra ativa */}
           {!licencaAtiva ? (
-            <div style={{ textAlign: 'center', padding: '20px 0' }}>
-              <p style={{ color: '#647489', fontSize: '14px', marginBottom: '12px' }}>Nenhuma licença ativa.</p>
-              <Link href="/#preco" style={{ padding: '10px 20px', background: '#3B82F6', color: '#fff', borderRadius: '8px', textDecoration: 'none', fontSize: '14px', fontWeight: '600' }}>⚡ Assinar agora</Link>
+            <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '16px', padding: '28px 0' }}>
+              <div style={{ width: '56px', height: '56px', borderRadius: '50%', background: 'rgba(59,130,246,0.08)', border: '1px solid rgba(59,130,246,0.15)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '26px' }}>🔒</div>
+              <div style={{ textAlign: 'center' }}>
+                <p style={{ fontWeight: '700', fontSize: '15px', marginBottom: '6px' }}>Você ainda não tem acesso ativo</p>
+                <p style={{ color: '#647489', fontSize: '13px' }}>Escolha um plano e comece a usar agora mesmo.</p>
+              </div>
+              <Link href="/#preco" style={{ padding: '11px 28px', background: '#3B82F6', color: '#fff', borderRadius: '8px', textDecoration: 'none', fontSize: '14px', fontWeight: '700' }}>Ver planos</Link>
             </div>
+
+          /* Estado 2: comprou mas não configurou o acesso */
           ) : !licencaAtiva.tipo ? (
-            <div style={{ background: 'rgba(251,191,36,0.08)', border: '1px solid rgba(251,191,36,0.2)', borderRadius: '10px', padding: '16px', textAlign: 'center' }}>
-              <p style={{ color: '#FBBF24', fontWeight: '700', marginBottom: '8px' }}>⚠️ Complete sua ativação</p>
-              <p style={{ color: '#647489', fontSize: '13px', marginBottom: '16px' }}>Você ainda não escolheu seu método de acesso ao software.</p>
-              <Link href="/obrigado" style={{ padding: '10px 20px', background: '#3B82F6', color: '#fff', borderRadius: '8px', textDecoration: 'none', fontSize: '14px', fontWeight: '600' }}>Escolher método de acesso</Link>
+            <div style={{ background: 'rgba(251,191,36,0.08)', border: '1px solid rgba(251,191,36,0.2)', borderRadius: '10px', padding: '20px', textAlign: 'center' }}>
+              <p style={{ fontSize: '22px', marginBottom: '8px' }}>⚠️</p>
+              <p style={{ color: '#FBBF24', fontWeight: '700', marginBottom: '6px' }}>Complete sua ativação</p>
+              <p style={{ color: '#647489', fontSize: '13px', marginBottom: '16px' }}>Você já tem acesso pago mas ainda não configurou o método de login no software.</p>
+              <Link href="/obrigado" style={{ padding: '10px 24px', background: '#3B82F6', color: '#fff', borderRadius: '8px', textDecoration: 'none', fontSize: '14px', fontWeight: '600' }}>Configurar agora</Link>
             </div>
+
+          /* Estado 3: acesso ativo com tudo configurado */
           ) : (
             <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
@@ -177,6 +191,7 @@ export default function MinhasComprasPage() {
                   <p style={{ fontSize: '14px' }}>{licencaAtiva.pcRegistrado ? '✅ Sim' : '⏳ Aguardando ativação'}</p>
                 </div>
               </div>
+
               {licencaAtiva.tipo === 'key' && licencaAtiva.key && (
                 <div>
                   <p style={{ fontSize: '12px', color: '#647489', marginBottom: '6px' }}>Sua key</p>
@@ -188,14 +203,43 @@ export default function MinhasComprasPage() {
                   </div>
                 </div>
               )}
+
               {licencaAtiva.tipo === 'usuario_senha' && (
                 <div style={{ background: '#151D2C', border: '1px solid #243044', borderRadius: '8px', padding: '12px' }}>
                   <p style={{ fontSize: '13px', color: '#647489' }}>Use o mesmo usuário e senha do site para fazer login no software.</p>
                 </div>
               )}
+
               <div style={{ background: 'rgba(251,191,36,0.06)', border: '1px solid rgba(251,191,36,0.15)', borderRadius: '8px', padding: '10px 12px' }}>
                 <p style={{ fontSize: '12px', color: '#FBBF24' }}>⚠️ Para trocar de PC, entre em contato com o suporte.</p>
               </div>
+
+              {/* Botão de download — versão atual */}
+              {versaoAtual && (
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', background: '#151D2C', border: '1px solid #243044', borderRadius: '10px', padding: '14px 16px', flexWrap: 'wrap', gap: '12px' }}>
+                  <div>
+                    <p style={{ fontSize: '13px', fontWeight: '600', marginBottom: '2px' }}>SumblerControl v{versaoAtual.numero}</p>
+                    {versaoAtual.notas && <p style={{ fontSize: '11px', color: '#647489', marginBottom: '2px' }}>{versaoAtual.notas}</p>}
+                    <p style={{ fontSize: '11px', color: '#647489' }}>Publicado em {new Date(versaoAtual.publicadaEm).toLocaleDateString('pt-BR')}</p>
+                  </div>
+                  <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: '6px' }}>
+                    {!versoesBaixadas.has(versaoAtual.id) && (
+                      <span style={{ fontSize: '11px', padding: '2px 8px', borderRadius: '999px', background: 'rgba(251,191,36,0.15)', color: '#FBBF24', fontWeight: '600' }}>
+                        🆕 Nova versão disponível
+                      </span>
+                    )}
+                    <a
+                      href={versaoAtual.link}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      onClick={registrarDownload}
+                      style={{ padding: '10px 20px', background: '#3B82F6', color: '#fff', borderRadius: '8px', textDecoration: 'none', fontSize: '14px', fontWeight: '700', whiteSpace: 'nowrap' }}
+                    >
+                      ⬇️ Baixar v{versaoAtual.numero}
+                    </a>
+                  </div>
+                </div>
+              )}
             </div>
           )}
         </div>
@@ -208,7 +252,7 @@ export default function MinhasComprasPage() {
             <div style={{ fontSize: '48px', marginBottom: '16px' }}>📭</div>
             <h2 style={{ fontSize: '18px', fontWeight: '700', marginBottom: '8px' }}>Nenhuma compra encontrada</h2>
             <p style={{ color: '#647489', fontSize: '14px', marginBottom: '24px' }}>Você ainda não realizou nenhuma compra.</p>
-            <Link href="/#preco" style={{ padding: '12px 24px', background: '#3B82F6', color: '#fff', borderRadius: '8px', textDecoration: 'none', fontSize: '14px', fontWeight: '600' }}>⚡ Assinar agora</Link>
+            <Link href="/#preco" style={{ padding: '12px 24px', background: '#3B82F6', color: '#fff', borderRadius: '8px', textDecoration: 'none', fontSize: '14px', fontWeight: '600' }}>Ver planos</Link>
           </div>
         ) : (
           <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
@@ -216,7 +260,6 @@ export default function MinhasComprasPage() {
               const diasPorPlano: Record<string, number> = { mensal: 30, semestral: 180, anual: 360 }
               const dias = diasPorPlano[c.plano || 'mensal'] ?? 30
               const planoLabel = c.plano === 'semestral' ? 'Plano Semestral' : c.plano === 'anual' ? 'Plano Anual' : 'Plano Mensal'
-              // Licença específica deste pedido
               const lic = licencasPorPedido[c.id]
 
               return (
@@ -229,36 +272,9 @@ export default function MinhasComprasPage() {
                         {c.pago_em ? new Date(c.pago_em).toLocaleDateString('pt-BR', { day: '2-digit', month: 'long', year: 'numeric' }) : new Date(c.criado_em).toLocaleDateString('pt-BR')}
                       </p>
                     </div>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '16px', flexWrap: 'wrap' }}>
-                      <div style={{ textAlign: 'right' }}>
-                        <p style={{ fontSize: '18px', fontWeight: '800' }}>R$ {c.valor_final.toFixed(2)}</p>
-                        <span style={{ padding: '3px 8px', borderRadius: '999px', fontSize: '12px', background: 'rgba(34,197,94,0.1)', color: '#22C55E' }}>✓ Pago</span>
-                      </div>
-                      {versaoAtual && (
-                        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: '4px' }}>
-                          {!versoesBaixadas.has(versaoAtual.id) && (
-                            <span style={{ fontSize: '11px', padding: '2px 8px', borderRadius: '999px', background: 'rgba(251,191,36,0.15)', color: '#FBBF24', fontWeight: '600', whiteSpace: 'nowrap' }}>
-                              🆕 v{versaoAtual.numero} disponível
-                            </span>
-                          )}
-                          <a
-                            href={versaoAtual.link}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            onClick={() => {
-                              fetch('/api/download/registrar', {
-                                method: 'POST',
-                                headers: { 'Content-Type': 'application/json' },
-                                credentials: 'include',
-                                body: JSON.stringify({ versaoId: versaoAtual.id }),
-                              }).then(() => setVersoesBaixadas(prev => new Set([...prev, versaoAtual.id])))
-                            }}
-                            style={{ padding: '10px 20px', background: '#3B82F6', color: '#fff', borderRadius: '8px', textDecoration: 'none', fontSize: '14px', fontWeight: '700', whiteSpace: 'nowrap' }}
-                          >
-                            ⬇️ Baixar v{versaoAtual.numero}
-                          </a>
-                        </div>
-                      )}
+                    <div style={{ textAlign: 'right' }}>
+                      <p style={{ fontSize: '18px', fontWeight: '800' }}>R$ {c.valor_final.toFixed(2)}</p>
+                      <span style={{ padding: '3px 8px', borderRadius: '999px', fontSize: '12px', background: 'rgba(34,197,94,0.1)', color: '#22C55E' }}>✓ Pago</span>
                     </div>
                   </div>
 
