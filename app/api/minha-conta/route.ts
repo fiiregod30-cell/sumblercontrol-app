@@ -22,7 +22,7 @@ export async function GET(req: NextRequest) {
   // Busca pedidos do usuário
   const { data: pedidos } = await supabaseAdmin
     .from('pedidos')
-    .select('id, valor_final, status, criado_em, pago_em, link_download')
+    .select('id, valor_final, status, criado_em, pago_em, link_download, plano')
     .eq('usuario_id', payload.id)
     .order('criado_em', { ascending: false })
 

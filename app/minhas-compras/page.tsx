@@ -9,12 +9,15 @@ interface Compra {
   criado_em: string
   pago_em: string | null
   link_download: string | null
+  plano: string | null
 }
 
 interface LicencaInfo {
   tipo: string | null
   key: string | null
   pcRegistrado?: boolean
+  diasRestantes?: number
+  expira_em?: string
 }
 
 export default function MinhasComprasPage() {
@@ -103,7 +106,11 @@ export default function MinhasComprasPage() {
                     #{c.id.slice(0, 8).toUpperCase()}
                   </p>
                   <p style={{ fontSize: '13px', color: '#647489' }}>
-                    SumblerControl — Plano Mensal
+                    SumblerControl — {
+                      c.plano === 'semestral' ? 'Plano Semestral' :
+                      c.plano === 'anual' ? 'Plano Anual' :
+                      'Plano Mensal'
+                    }
                   </p>
                   <p style={{ fontSize: '12px', color: '#647489', marginTop: '2px' }}>
                     {c.pago_em ? new Date(c.pago_em).toLocaleDateString('pt-BR', { day: '2-digit', month: 'long', year: 'numeric' }) : new Date(c.criado_em).toLocaleDateString('pt-BR')}
@@ -139,8 +146,14 @@ export default function MinhasComprasPage() {
                     )}
                     {/* Status de ativação */}
                     {licenca.tipo && (
-                      <span style={{ fontSize: '11px', padding: '2px 8px', borderRadius: '4px', background: (licenca as LicencaInfo & { pcRegistrado?: boolean }).pcRegistrado ? 'rgba(34,197,94,0.08)' : 'rgba(251,191,36,0.08)', color: (licenca as LicencaInfo & { pcRegistrado?: boolean }).pcRegistrado ? '#22C55E' : '#FBBF24' }}>
-                        {(licenca as LicencaInfo & { pcRegistrado?: boolean }).pcRegistrado ? '✅ Ativado' : '⏳ Aguardando ativação'}
+                      <span style={{ fontSize: '11px', padding: '2px 8px', borderRadius: '4px', background: licenca.pcRegistrado ? 'rgba(34,197,94,0.08)' : 'rgba(251,191,36,0.08)', color: licenca.pcRegistrado ? '#22C55E' : '#FBBF24' }}>
+                        {licenca.pcRegistrado ? '✅ Ativado' : '⏳ Aguardando ativação'}
+                      </span>
+                    )}
+                    {/* Dias restantes */}
+                    {licenca.diasRestantes !== undefined && (
+                      <span style={{ fontSize: '11px', padding: '2px 8px', borderRadius: '4px', background: licenca.diasRestantes > 7 ? 'rgba(59,130,246,0.08)' : 'rgba(239,68,68,0.08)', color: licenca.diasRestantes > 7 ? '#3B82F6' : '#EF4444' }}>
+                        ⏱ {licenca.diasRestantes} {licenca.diasRestantes === 1 ? 'dia' : 'dias'} restantes
                       </span>
                     )}
                   </div>
