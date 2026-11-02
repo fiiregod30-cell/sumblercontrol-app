@@ -7,7 +7,7 @@ interface Cupom {
   usos_maximos: number | null; usos_atuais: number; expira_em: string | null; ativo: boolean
 }
 interface Stats { usuarios: number; vendas: number; receita: number }
-interface Config { preco: number; preco_semestral: number; preco_anual: number; imagem_url: string; link_download: string; produto_nome: string }
+interface Config { preco: number; preco_semestral: number; preco_anual: number; imagem_url: string; link_download: string; produto_nome: string; discord_url?: string }
 interface Licenca {
   id: string; tipo: string | null; key: string | null; ativa: boolean
   expira_em: string; hwid: string | null; statusHwid: string; ultimo_acesso: string | null
@@ -463,6 +463,17 @@ export default function AdminDashboard() {
                 <div>
                   <label style={labelStyle}>URL da imagem do produto</label>
                   <input value={config.imagem_url} onChange={e => setConfig(p => ({ ...p, imagem_url: e.target.value }))} placeholder="https://... ou /assets/SumblerControl.png" style={inputStyle} />
+                </div>
+
+                <div>
+                  <label style={labelStyle}>Link do Discord</label>
+                  <input
+                    value={(config as Config & { discord_url?: string }).discord_url || ''}
+                    onChange={e => setConfig(p => ({ ...p, discord_url: e.target.value }))}
+                    placeholder="https://discord.gg/..."
+                    style={inputStyle}
+                  />
+                  <p style={{ fontSize: '12px', color: '#647489', marginTop: '4px' }}>Aparece no botão Discord do widget de suporte e na página principal.</p>
                 </div>
 
                 {configMsg && (
