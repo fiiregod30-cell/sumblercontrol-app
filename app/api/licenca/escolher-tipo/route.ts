@@ -33,7 +33,7 @@ export async function POST(req: NextRequest) {
     let keyGerada: string | null = null
 
     if (tipo === 'key') {
-      // Gera uma key única
+      // Gera uma key única — sempre nova, independente de já ter uma anterior
       let tentativas = 0
       do {
         keyGerada = gerarKey()
@@ -44,7 +44,11 @@ export async function POST(req: NextRequest) {
           .single()
         if (!exists) break
         tentativas++
-      } while (tentativas < 5)
+      } while (tentativas < 10)
+
+      if (!keyGerada) {
+        return NextResponse.json({ error: 'Não foi possível gerar uma key única. Tente novamente.' }, { status: 500 })
+      }
     }
 
     // Atualiza a licença com o tipo escolhido

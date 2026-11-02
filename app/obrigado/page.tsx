@@ -24,6 +24,7 @@ function ObrigadoContent() {
   const [copiado, setCopiado] = useState(false)
   const [loadingEscolha, setLoadingEscolha] = useState(false)
   const [erroEscolha, setErroEscolha] = useState('')
+  const [toastVisible, setToastVisible] = useState(false)
 
   // Aguarda a licença ser criada pelo webhook (polling até 30s)
   async function aguardarLicenca(tentativas = 0): Promise<LicencaInfo | null> {
@@ -95,6 +96,9 @@ function ObrigadoContent() {
       if (tipo === 'key' && data.key) {
         setKeyGerada(data.key)
         setEtapa('key_gerada')
+        // Mostra toast "Nova key gerada!"
+        setToastVisible(true)
+        setTimeout(() => setToastVisible(false), 3500)
       } else if (tipo === 'usuario_senha') {
         setEtapa('usuario_senha')
       }
@@ -114,6 +118,20 @@ function ObrigadoContent() {
   return (
     <div style={{ minHeight: '100vh', background: '#090F1A', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '24px' }}>
       <div style={{ width: '100%', maxWidth: '520px' }}>
+
+        {/* Toast — Nova key gerada */}
+        {toastVisible && (
+          <div style={{
+            position: 'fixed', top: '24px', left: '50%', transform: 'translateX(-50%)',
+            background: '#22C55E', color: '#fff', padding: '12px 24px', borderRadius: '999px',
+            fontSize: '14px', fontWeight: '700', zIndex: 9999,
+            boxShadow: '0 4px 24px rgba(34,197,94,0.4)',
+            display: 'flex', alignItems: 'center', gap: '8px',
+            animation: 'fadeIn 0.3s ease'
+          }}>
+            🔑 Nova key gerada com sucesso!
+          </div>
+        )}
 
         {/* Header — sempre visível */}
         <div style={{ textAlign: 'center', marginBottom: '28px' }}>

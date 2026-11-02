@@ -129,7 +129,7 @@ export default function MinhasComprasPage() {
                 </div>
                 {/* Info de acesso */}
                 {licenca && (
-                  <div style={{ marginTop: '12px', borderTop: '1px solid #1E2939', paddingTop: '10px', display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
+                  <div style={{ width: '100%', marginTop: '12px', borderTop: '1px solid #1E2939', paddingTop: '10px', display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
                     <span style={{ fontSize: '11px', color: '#647489' }}>Acesso:</span>
                     {licenca.tipo === 'key' ? (
                       <span style={{ fontSize: '12px', color: '#3B82F6', fontFamily: 'monospace', background: 'rgba(59,130,246,0.08)', padding: '2px 8px', borderRadius: '4px' }}>
@@ -150,12 +150,16 @@ export default function MinhasComprasPage() {
                         {licenca.pcRegistrado ? '✅ Ativado' : '⏳ Aguardando ativação'}
                       </span>
                     )}
-                    {/* Dias restantes */}
-                    {licenca.diasRestantes !== undefined && (
-                      <span style={{ fontSize: '11px', padding: '2px 8px', borderRadius: '4px', background: licenca.diasRestantes > 7 ? 'rgba(59,130,246,0.08)' : 'rgba(239,68,68,0.08)', color: licenca.diasRestantes > 7 ? '#3B82F6' : '#EF4444' }}>
-                        ⏱ {licenca.diasRestantes} {licenca.diasRestantes === 1 ? 'dia' : 'dias'} restantes
-                      </span>
-                    )}
+                    {/* Dias restantes — calculado pelo plano do pedido */}
+                    {(() => {
+                      const diasPorPlano: Record<string, number> = { mensal: 30, semestral: 180, anual: 360 }
+                      const dias = diasPorPlano[c.plano || 'mensal'] ?? 30
+                      return (
+                        <span style={{ fontSize: '11px', padding: '2px 8px', borderRadius: '4px', background: 'rgba(59,130,246,0.08)', color: '#3B82F6' }}>
+                          ⏱ {dias} dias
+                        </span>
+                      )
+                    })()}
                   </div>
                 )}
               </div>
