@@ -13,7 +13,7 @@ export async function GET(req: NextRequest) {
   // Busca dados do usuário
   const { data: usuario } = await supabaseAdmin
     .from('usuarios')
-    .select('nome, sobrenome, email, telefone, username')
+    .select('nome, sobrenome, email, telefone, username, avatar_url')
     .eq('id', payload.id)
     .single()
 
