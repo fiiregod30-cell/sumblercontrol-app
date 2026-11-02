@@ -34,19 +34,9 @@ export async function POST(req: NextRequest) {
       .single()
 
     if (pedidoPendente) {
-      if (cupomId) {
-        await supabaseAdmin.from('pedidos').update({ status: 'cancelado' }).eq('id', pedidoPendente.id)
-      } else if (pedidoPendente.pix_qr_code && pedidoPendente.pix_copia_cola) {
-        return NextResponse.json({
-          pedidoId: pedidoPendente.id,
-          qrCode: pedidoPendente.pix_qr_code,
-          copiaCola: pedidoPendente.pix_copia_cola,
-          valorFinal: pedidoPendente.valor_final,
-          existente: true
-        })
-      } else {
-        await supabaseAdmin.from('pedidos').update({ status: 'cancelado' }).eq('id', pedidoPendente.id)
-      }
+      // Sempre cancela o pedido pendente e cria um novo
+      // Garante que o novo pedido terá notification_url correta
+      await supabaseAdmin.from('pedidos').update({ status: 'cancelado' }).eq('id', pedidoPendente.id)
     }
 
     // Busca configurações do banco — preço correto por plano + link de download
