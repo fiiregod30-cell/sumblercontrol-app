@@ -12,7 +12,7 @@ export async function GET(req: NextRequest) {
 
   const { data: user } = await supabaseAdmin
     .from('usuarios')
-    .select('nome, sobrenome, email, username')
+    .select('nome, sobrenome, email, username, avatar_url')
     .eq('id', payload.id)
     .single()
 
@@ -20,10 +20,12 @@ export async function GET(req: NextRequest) {
 
   return NextResponse.json({
     logado: true,
+    id: payload.id,
     nome: user.nome,
     sobrenome: user.sobrenome,
     email: user.email,
     username: user.username,
     nomeCompleto: `${user.nome} ${user.sobrenome}`,
+    avatar_url: user.avatar_url || null,
   })
 }

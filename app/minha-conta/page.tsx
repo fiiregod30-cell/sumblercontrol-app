@@ -1,5 +1,5 @@
 'use client'
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 
@@ -9,12 +9,16 @@ interface Usuario {
   email: string
   telefone: string
   username: string
+  avatar_url?: string | null
 }
 
 export default function MinhaContaPage() {
   const router = useRouter()
   const [usuario, setUsuario] = useState<Usuario | null>(null)
   const [loading, setLoading] = useState(true)
+  const [uploadando, setUploadando] = useState(false)
+  const [uploadMsg, setUploadMsg] = useState('')
+  const fileRef = useRef<HTMLInputElement>(null)
 
   useEffect(() => {
     fetch('/api/minha-conta', { credentials: 'include' })
@@ -35,6 +39,44 @@ export default function MinhaContaPage() {
     router.push('/')
   }
 
+  async function handleAvatar(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0]
+    if (!file) return
+
+    setUploadando(true)
+    setUploadMsg('')
+
+    const form = new FormData()
+    form.append('avatar', file)
+
+    const r = await fetch('/api/minha-conta/avatar', {
+      method: 'POST',
+      credentials: 'include',
+      body: form,
+    })
+
+    const d = await r.json()
+    if (r.ok) {
+      setUsuario(prev => prev ? { ...prev, avatar_url: d.avatar_url } : prev)
+      setUploadMsg('✓ Foto atualizada!')
+    } else {
+      setUploadMsg('✗ ' + (d.error || 'Erro ao enviar imagem.'))
+    }
+
+    setUploadando(false)
+    // Limpa input para permitir reenviar o mesmo arquivo
+    if (fileRef.current) fileRef.current.value = ''
+  }
+
+  async function removerAvatar() {
+    if (!confirm('Remover foto de perfil?')) return
+    setUploadando(true)
+    await fetch('/api/minha-conta/avatar', { method: 'DELETE', credentials: 'include' })
+    setUsuario(prev => prev ? { ...prev, avatar_url: null } : prev)
+    setUploadMsg('✓ Foto removida.')
+    setUploadando(false)
+  }
+
   if (loading) {
     return (
       <div style={{ minHeight: '100vh', background: '#090F1A', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
@@ -43,8 +85,10 @@ export default function MinhaContaPage() {
     )
   }
 
+  const iniciais = `${usuario?.nome?.charAt(0) || ''}${usuario?.sobrenome?.charAt(0) || ''}`.toUpperCase()
+
   return (
-    <div style={{ minHeight: '100vh', background: '#090F1A', color: '#F1F5FA', padding: '80px 24px 40px' }}>
+    <div style={{ minHeight: '100vh', background: '#090F1A', color: '#F1F5FA', padding: '80px 24px 40px', fontFamily: 'Inter, sans-serif' }}>
       {/* Nav */}
       <nav style={{ position: 'fixed', top: 0, left: 0, right: 0, zIndex: 100, background: 'rgba(9,15,26,0.9)', backdropFilter: 'blur(16px)', borderBottom: '1px solid #1E2939', height: '64px', display: 'flex', alignItems: 'center', padding: '0 24px', justifyContent: 'space-between' }}>
         <Link href="/" style={{ display: 'flex', alignItems: 'center', gap: '8px', textDecoration: 'none', color: '#F1F5FA', fontWeight: '700' }}>
@@ -57,6 +101,9 @@ export default function MinhaContaPage() {
           <Link href="/minhas-compras" style={{ padding: '6px 14px', background: 'transparent', border: '1px solid #243044', borderRadius: '6px', color: '#647489', fontSize: '13px', textDecoration: 'none' }}>
             📦 Minhas Compras
           </Link>
+          <Link href="/notificacoes" style={{ padding: '6px 14px', background: 'transparent', border: '1px solid #243044', borderRadius: '6px', color: '#647489', fontSize: '13px', textDecoration: 'none' }}>
+            🔔 Suporte
+          </Link>
           <button onClick={logout} style={{ padding: '6px 14px', background: 'transparent', border: '1px solid #243044', borderRadius: '6px', color: '#647489', fontSize: '13px', cursor: 'pointer' }}>
             Sair
           </button>
@@ -64,12 +111,58 @@ export default function MinhaContaPage() {
       </nav>
 
       <div style={{ maxWidth: '720px', margin: '0 auto' }}>
-        {/* Header */}
-        <div style={{ marginBottom: '32px' }}>
-          <h1 style={{ fontSize: '24px', fontWeight: '800', marginBottom: '4px' }}>
-            Olá, {usuario?.nome}!
-          </h1>
-          <p style={{ color: '#647489', fontSize: '14px' }}>{usuario?.email}</p>
+        {/* Header com avatar */}
+        <div style={{ display: 'flex', alignItems: 'center', gap: '24px', marginBottom: '32px' }}>
+          {/* Avatar */}
+          <div style={{ position: 'relative', flexShrink: 0 }}>
+            {usuario?.avatar_url ? (
+              <img
+                src={usuario.avatar_url}
+                alt="Avatar"
+                style={{ width: '80px', height: '80px', borderRadius: '50%', objectFit: 'cover', border: '3px solid rgba(59,130,246,0.4)' }}
+              />
+            ) : (
+              <div style={{ width: '80px', height: '80px', borderRadius: '50%', background: 'linear-gradient(135deg, #3B82F6, #818CF8)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '28px', fontWeight: '800', color: '#fff', border: '3px solid rgba(59,130,246,0.4)' }}>
+                {iniciais}
+              </div>
+            )}
+          </div>
+
+          {/* Nome + ações de avatar */}
+          <div style={{ flex: 1 }}>
+            <h1 style={{ fontSize: '22px', fontWeight: '800', marginBottom: '4px' }}>
+              {usuario?.nome} {usuario?.sobrenome}
+            </h1>
+            <p style={{ color: '#647489', fontSize: '13px', marginBottom: '12px' }}>{usuario?.email}</p>
+            <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap', alignItems: 'center' }}>
+              <input
+                ref={fileRef}
+                type="file"
+                accept="image/jpeg,image/png,image/webp,image/gif"
+                onChange={handleAvatar}
+                style={{ display: 'none' }}
+                id="avatar-input"
+              />
+              <label
+                htmlFor="avatar-input"
+                style={{ padding: '6px 14px', background: '#3B82F6', borderRadius: '7px', color: '#fff', fontSize: '12px', fontWeight: '600', cursor: uploadando ? 'not-allowed' : 'pointer', opacity: uploadando ? 0.6 : 1 }}>
+                {uploadando ? 'Enviando...' : '📷 Alterar foto'}
+              </label>
+              {usuario?.avatar_url && (
+                <button
+                  onClick={removerAvatar}
+                  disabled={uploadando}
+                  style={{ padding: '6px 14px', background: 'transparent', border: '1px solid rgba(239,68,68,0.3)', borderRadius: '7px', color: '#EF4444', fontSize: '12px', cursor: 'pointer' }}>
+                  Remover foto
+                </button>
+              )}
+              {uploadMsg && (
+                <span style={{ fontSize: '12px', color: uploadMsg.startsWith('✓') ? '#22C55E' : '#EF4444' }}>
+                  {uploadMsg}
+                </span>
+              )}
+            </div>
+          </div>
         </div>
 
         {/* Dados da conta */}
@@ -84,7 +177,7 @@ export default function MinhaContaPage() {
             ].map(item => (
               <div key={item.label}>
                 <p style={{ fontSize: '12px', color: '#647489', marginBottom: '4px' }}>{item.label}</p>
-                <p style={{ fontSize: '14px' }}>{item.value}</p>
+                <p style={{ fontSize: '14px', margin: 0 }}>{item.value}</p>
               </div>
             ))}
           </div>

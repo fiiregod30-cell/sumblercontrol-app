@@ -9,7 +9,7 @@ import { rateLimit } from '@/lib/rateLimit'
 export async function GET() {
   const { data } = await supabaseAdmin
     .from('chat_mensagens')
-    .select('id, nome, mensagem, criado_em')
+    .select('id, nome, mensagem, criado_em, avatar_url')
     .order('criado_em', { ascending: true })
     .limit(50)
 
@@ -82,19 +82,20 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'Mensagem muito longa (máx. 500 caracteres).' }, { status: 400 })
     }
 
-    // Busca o nome do usuário
+    // Busca o nome e avatar do usuário
     const { data: user } = await supabaseAdmin
       .from('usuarios')
-      .select('nome, sobrenome')
+      .select('nome, sobrenome, avatar_url')
       .eq('id', payload.id)
       .single()
 
     const nome = user ? `${user.nome} ${user.sobrenome}`.trim() : 'Usuário'
+    const avatar_url = user?.avatar_url || null
 
     const { data: nova } = await supabaseAdmin
       .from('chat_mensagens')
-      .insert({ usuario_id: payload.id, nome, mensagem: mensagem.trim() })
-      .select('id, nome, mensagem, criado_em')
+      .insert({ usuario_id: payload.id, nome, mensagem: mensagem.trim(), avatar_url })
+      .select('id, nome, mensagem, criado_em, avatar_url')
       .single()
 
     return NextResponse.json({ mensagem: nova })

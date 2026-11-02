@@ -40,6 +40,7 @@ export async function PATCH(req: NextRequest) {
   if (body.link_download !== undefined) updates.link_download = body.link_download
   if (body.produto_nome !== undefined) updates.produto_nome = body.produto_nome
   if (body.discord_url !== undefined) updates.discord_url = body.discord_url
+  if (body.bot_avatar_url !== undefined) updates.bot_avatar_url = body.bot_avatar_url
   updates.atualizado_em = new Date().toISOString()
 
   const { error } = await supabaseAdmin

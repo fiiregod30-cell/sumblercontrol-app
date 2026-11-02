@@ -9,6 +9,7 @@ interface ChatMensagem {
   nome: string
   mensagem: string
   criado_em: string
+  avatar_url?: string | null
 }
 
 type ChatStatus = 'carregando' | 'visitante' | 'pendente' | 'expirado' | 'ativo'
@@ -282,13 +283,24 @@ export default function SupportWidget() {
                   </div>
                 )}
                 {mensagens.map(m => {
-                  const isBot = m.nome.includes('SumblerBot')
+                  const isBot = m.nome.includes('SumblerBot') || m.nome === 'SumblerControl'
                   return (
-                    <div key={m.id} style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
-                      <span style={{ fontSize: '11px', color: isBot ? '#3B82F6' : '#647489', paddingLeft: '4px', fontWeight: isBot ? '600' : '400' }}>
-                        {m.nome}
-                      </span>
-                      <div style={{ maxWidth: '85%', padding: '8px 12px', borderRadius: '12px 12px 12px 2px', background: isBot ? 'rgba(59,130,246,0.12)' : '#1E2939', color: '#F1F5FA', fontSize: '13px', lineHeight: 1.5, border: isBot ? '1px solid rgba(59,130,246,0.25)' : 'none', whiteSpace: 'pre-wrap', wordBreak: 'break-word' }}>
+                    <div key={m.id} style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                      {/* Cabeçalho da mensagem: avatar + nome */}
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '6px', paddingLeft: '2px' }}>
+                        {m.avatar_url ? (
+                          <img src={m.avatar_url} alt={m.nome} style={{ width: '20px', height: '20px', borderRadius: '50%', objectFit: 'cover', flexShrink: 0 }} />
+                        ) : (
+                          <div style={{ width: '20px', height: '20px', borderRadius: '50%', background: isBot ? 'rgba(59,130,246,0.3)' : '#1E2939', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '10px', fontWeight: '700', color: isBot ? '#3B82F6' : '#647489', flexShrink: 0 }}>
+                            {m.nome.charAt(0).toUpperCase()}
+                          </div>
+                        )}
+                        <span style={{ fontSize: '11px', color: isBot ? '#3B82F6' : '#647489', fontWeight: isBot ? '600' : '400' }}>
+                          {m.nome}
+                        </span>
+                      </div>
+                      {/* Bolha */}
+                      <div style={{ maxWidth: '85%', marginLeft: '26px', padding: '8px 12px', borderRadius: '2px 12px 12px 12px', background: isBot ? 'rgba(59,130,246,0.12)' : '#1E2939', color: '#F1F5FA', fontSize: '13px', lineHeight: 1.5, border: isBot ? '1px solid rgba(59,130,246,0.25)' : 'none', whiteSpace: 'pre-wrap', wordBreak: 'break-word' }}>
                         {m.mensagem.replace(/\*\*(.*?)\*\*/g, '$1')}
                       </div>
                     </div>

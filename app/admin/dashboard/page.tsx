@@ -7,7 +7,7 @@ interface Cupom {
   usos_maximos: number | null; usos_atuais: number; expira_em: string | null; ativo: boolean
 }
 interface Stats { usuarios: number; vendas: number; receita: number }
-interface Config { preco: number; preco_semestral: number; preco_anual: number; imagem_url: string; link_download: string; produto_nome: string; discord_url?: string }
+interface Config { preco: number; preco_semestral: number; preco_anual: number; imagem_url: string; link_download: string; produto_nome: string; discord_url?: string; bot_avatar_url?: string }
 interface Licenca {
   id: string; tipo: string | null; key: string | null; ativa: boolean
   expira_em: string; hwid: string | null; statusHwid: string; ultimo_acesso: string | null
@@ -528,6 +528,24 @@ export default function AdminDashboard() {
                     style={inputStyle}
                   />
                   <p style={{ fontSize: '12px', color: '#647489', marginTop: '4px' }}>Aparece no botão Discord do widget de suporte e na página principal.</p>
+                </div>
+
+                {/* Imagem do Bot */}
+                <div>
+                  <label style={labelStyle}>Imagem do Bot (URL)</label>
+                  <input
+                    value={config.bot_avatar_url || ''}
+                    onChange={e => setConfig(p => ({ ...p, bot_avatar_url: e.target.value }))}
+                    placeholder="https://... (URL pública da imagem)"
+                    style={inputStyle}
+                  />
+                  <p style={{ fontSize: '12px', color: '#647489', marginTop: '4px' }}>Aparece ao lado das mensagens automáticas do bot no chat. Recomendado: 40x40px.</p>
+                  {config.bot_avatar_url && (
+                    <div style={{ marginTop: '8px', display: 'flex', alignItems: 'center', gap: '10px' }}>
+                      <img src={config.bot_avatar_url} alt="Bot" style={{ width: '40px', height: '40px', borderRadius: '50%', objectFit: 'cover', border: '2px solid #1E2939' }} />
+                      <span style={{ fontSize: '12px', color: '#647489' }}>Preview da imagem do bot</span>
+                    </div>
+                  )}
                 </div>
 
                 {configMsg && (

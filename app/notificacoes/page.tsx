@@ -202,8 +202,8 @@ export default function SuportePage() {
         {/* Abas principais */}
         <div style={{ display: 'flex', gap: '4px', borderBottom: '1px solid #1E2939', marginBottom: '28px' }}>
           {([
-            { id: 'tickets' as AbaView, label: '🎫 Meus Tickets', badge: ticketsComNovaMensagem },
             { id: 'notificacoes' as AbaView, label: '🔔 Notificações', badge: totalNaoLidas },
+            { id: 'tickets' as AbaView, label: '🎫 Meus Tickets', badge: ticketsComNovaMensagem },
           ]).map(item => (
             <button
               key={item.id}
