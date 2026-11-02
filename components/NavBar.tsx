@@ -88,7 +88,7 @@ export default function NavBar() {
           {/* Logo */}
           <Link href="/" style={{ display: 'flex', alignItems: 'center', gap: '10px', textDecoration: 'none', color: '#F1F5FA', fontWeight: '800', fontSize: '17px', flex: 1 }}>
             <div style={{ width: '34px', height: '34px', borderRadius: '8px', overflow: 'hidden', flexShrink: 0 }}>
-              <img src="/assets/SumblerControl.png" alt="SumblerControl" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+              <img src="/assets/logomarca.png" alt="SumblerControl" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
             </div>
             SumblerControl
           </Link>
