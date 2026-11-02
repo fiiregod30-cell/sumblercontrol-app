@@ -85,10 +85,10 @@ export async function POST(req: NextRequest, { params }: Params) {
 
   const { id } = await params
 
-  // Busca o ticket
+  // Busca o ticket com assunto incluído
   const { data: ticket } = await supabaseAdmin
     .from('tickets')
-    .select('id, status, usuario_id')
+    .select('id, status, usuario_id, assunto')
     .eq('id', id)
     .single()
 
@@ -146,20 +146,13 @@ export async function POST(req: NextRequest, { params }: Params) {
 
     // Cria notificação para o usuário (se tiver usuario_id)
     if (ticket.usuario_id) {
-      // Busca assunto do ticket para compor título
-      const { data: ticketInfo } = await supabaseAdmin
-        .from('tickets')
-        .select('assunto')
-        .eq('id', id)
-        .single()
-
       await supabaseAdmin
         .from('notificacoes')
         .insert({
           usuario_id: ticket.usuario_id,
           ticket_id: id,
           tipo: 'ticket_resposta',
-          titulo: `Nova resposta no seu ticket: ${ticketInfo?.assunto || 'Suporte'}`,
+          titulo: `Nova resposta no seu ticket: ${ticket.assunto || 'Suporte'}`,
         })
     }
   }
