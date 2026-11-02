@@ -74,7 +74,7 @@ type AbaView = 'tickets' | 'notificacoes'
 export default function SuportePage() {
   const router = useRouter()
 
-  const [aba, setAba] = useState<AbaView>('tickets')
+  const [aba, setAba] = useState<AbaView>('notificacoes')
   const [loading, setLoading] = useState(true)
 
   // Tickets
