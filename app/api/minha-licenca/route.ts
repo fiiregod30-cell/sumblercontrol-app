@@ -25,11 +25,17 @@ export async function GET(req: NextRequest) {
   const expira = new Date(licenca.expira_em)
   const diasRestantes = Math.max(0, Math.ceil((expira.getTime() - Date.now()) / (1000 * 60 * 60 * 24)))
 
+  // Mascara a key: expõe apenas os últimos 4 chars (ex: SC-****-****-****-A1B2)
+  // A key completa só é retornada pelo endpoint /api/minha-licenca/revelar-key
+  const keyMascarada = licenca.key
+    ? licenca.key.replace(/^(SC-)[A-Z0-9]{4}-[A-Z0-9]{4}-[A-Z0-9]{4}-/, '$1****-****-****-')
+    : null
+
   return NextResponse.json({
     licenca: {
       id: licenca.id,
       tipo: licenca.tipo,
-      key: licenca.key,
+      key: keyMascarada,
       ativa: licenca.ativa,
       expira_em: licenca.expira_em,
       diasRestantes,

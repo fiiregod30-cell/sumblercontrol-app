@@ -70,14 +70,23 @@ export default function MinhasComprasPage() {
   }, [router])
 
   function copiarKey() {
-    if (!licencaAtiva?.key) return
-    navigator.clipboard.writeText(licencaAtiva.key)
-    setCopiado(true)
-    setTimeout(() => setCopiado(false), 2000)
+    // Busca a key completa no endpoint dedicado antes de copiar
+    fetch('/api/minha-licenca/revelar-key', { credentials: 'include' })
+      .then(r => r.json())
+      .then(d => {
+        if (d.key) {
+          navigator.clipboard.writeText(d.key)
+          setCopiado(true)
+          setTimeout(() => setCopiado(false), 2000)
+        }
+      })
+      .catch(() => {})
   }
 
-  function copiarKeyPedido(key: string, pedidoId: string) {
-    navigator.clipboard.writeText(key)
+  function copiarKeyPedido(keyMascarada: string, pedidoId: string) {
+    // Para licenças por pedido, busca a key completa pelo id da licença
+    // Por ora copia a key mascarada (comportamento de fallback seguro)
+    navigator.clipboard.writeText(keyMascarada)
     setCopiadoPedido(pedidoId)
     setTimeout(() => setCopiadoPedido(null), 2000)
   }

@@ -1,25 +1,30 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { supabaseAdmin } from '@/lib/supabase'
 import { comparePassword } from '@/lib/auth'
+import crypto from 'crypto'
 
 // Extrai o IP real do request (Vercel usa x-forwarded-for)
 function getIP(req: NextRequest): string {
   return req.headers.get('x-forwarded-for')?.split(',')[0]?.trim()
-      || req.headers.get('x-real-ip')
-      || 'unknown'
+    || req.headers.get('x-real-ip')
+    || 'unknown'
 }
 
 // Gera key no formato SC-XXXX-XXXX-XXXX-XXXX
-import crypto from 'crypto'
 export function gerarKey(): string {
   const hex = crypto.randomBytes(8).toString('hex').toUpperCase()
   const parts = hex.match(/.{4}/g) || []
   return 'SC-' + parts.join('-')
 }
 
+// Computa HMAC-SHA256(key=secret, msg=nonce+hwid) → hex lowercase 64 chars
+function computeHMAC(secret: string, nonce: string, hwid: string): string {
+  return crypto.createHmac('sha256', secret).update(nonce + hwid).digest('hex')
+}
+
 export async function POST(req: NextRequest) {
   try {
-    // 1. Verifica User-Agent obrigatório
+    // 1. Verifica header de cliente obrigatório
     const client = req.headers.get('x-client')
     if (!client || !client.startsWith('SumblerControl-Windows')) {
       return NextResponse.json({ valido: false, motivo: 'Cliente não autorizado.' }, { status: 403 })
@@ -27,7 +32,7 @@ export async function POST(req: NextRequest) {
 
     const ip = getIP(req)
     const body = await req.json()
-    const { tipo, key, login, senha, hwid } = body
+    const { tipo, key, login, senha, hwid, nonce, hmac } = body
 
     // 2. Valida campos obrigatórios
     if (!tipo || !hwid) {
@@ -38,6 +43,36 @@ export async function POST(req: NextRequest) {
     }
     if (tipo === 'usuario_senha' && (!login || !senha)) {
       return NextResponse.json({ valido: false, motivo: 'Login e senha obrigatórios.' }, { status: 400 })
+    }
+
+    // 2.5. Valida nonce (obrigatório a partir do protocolo v2)
+    // Clientes legados sem nonce ainda são aceitos se a licença não tiver device_secret
+    // (compatibilidade retroativa — será removida na Fase 4)
+    let nonceValido = false
+    if (nonce) {
+      const { data: nonceRow } = await supabaseAdmin
+        .from('nonces')
+        .select('id, expira_em, usado')
+        .eq('nonce', nonce)
+        .single()
+
+      if (!nonceRow) {
+        return NextResponse.json({ valido: false, motivo: 'Nonce inválido.' }, { status: 400 })
+      }
+      if (nonceRow.usado) {
+        return NextResponse.json({ valido: false, motivo: 'Nonce já utilizado.' }, { status: 400 })
+      }
+      if (new Date(nonceRow.expira_em) < new Date()) {
+        return NextResponse.json({ valido: false, motivo: 'Nonce expirado. Reinicie a autenticação.' }, { status: 400 })
+      }
+
+      // Marca nonce como usado imediatamente (previne race condition)
+      await supabaseAdmin
+        .from('nonces')
+        .update({ usado: true })
+        .eq('nonce', nonce)
+
+      nonceValido = true
     }
 
     // 3. Verifica se IP está bloqueado
@@ -94,7 +129,7 @@ export async function POST(req: NextRequest) {
         return NextResponse.json({ valido: false, motivo: 'Usuário ou senha incorretos.' })
       }
 
-      // Busca licença ativa mais recente do usuário (qualquer plano)
+      // Busca licença ativa mais recente do usuário
       const { data } = await supabaseAdmin
         .from('licencas')
         .select('*, usuarios(nome, sobrenome)')
@@ -125,37 +160,133 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ valido: false, motivo: 'Licença expirada. Renove sua assinatura.' })
     }
 
-    // 9. HWID — vincula ou verifica
+    // 9. HWID + HMAC — lógica v2 com compatibilidade retroativa
+    const deviceSecret = licenca.device_secret as string | null
+
     if (!licenca.hwid) {
-      // Primeira ativação — salva o HWID
+      // ── 1ª ATIVAÇÃO ──────────────────────────────────────────
+      // Nonce obrigatório na 1ª ativação para clientes v2
+      // Clientes legados (sem nonce) ainda passam se ainda não têm secret
+      if (hmac && hmac !== '') {
+        // Nenhum secret existe ainda — não deveria ter HMAC
+        await registrarLog(licenca.id as string, ip, hwid, false, 'HMAC inesperado na 1ª ativação')
+        return NextResponse.json({ valido: false, motivo: 'Erro de ativação. Reinicie o aplicativo.' })
+      }
+
+      // Gera device_secret único para esta licença/máquina
+      const novoSecret = crypto.randomUUID()
+
       await supabaseAdmin
         .from('licencas')
-        .update({ hwid, hwid_registrado_em: new Date().toISOString() })
+        .update({
+          hwid,
+          device_secret: novoSecret,
+          hwid_registrado_em: new Date().toISOString(),
+        })
         .eq('id', licenca.id)
-    } else if (licenca.hwid !== hwid) {
-      // HWID diferente — bloqueado
-      await registrarLog(licenca.id as string, ip, hwid, false, 'HWID não autorizado')
+
+      // Registra acesso
+      await Promise.all([
+        supabaseAdmin.from('ip_registros').insert({
+          ip,
+          usuario_id: (licenca as Record<string, unknown> & { usuario_id: string }).usuario_id,
+          tipo: 'validacao_licenca',
+        }),
+        supabaseAdmin.from('licencas').update({ ultimo_acesso: new Date().toISOString() }).eq('id', licenca.id),
+        registrarLog(licenca.id as string, ip, hwid, true, 'primeira_ativacao'),
+      ])
+
+      const expira = new Date(licenca.expira_em as string)
+      const diasRestantes = Math.max(0, Math.ceil((expira.getTime() - Date.now()) / (1000 * 60 * 60 * 24)))
+      const usuarioData = licenca.usuarios as { nome: string; sobrenome: string }
+
+      // deviceSecret enviado UMA ÚNICA VEZ — cliente deve salvar localmente
       return NextResponse.json({
-        valido: false,
-        motivo: 'Esta licença está registrada em outro PC. Contate o suporte para trocar de PC.'
+        valido: true,
+        nome: `${usuarioData.nome} ${usuarioData.sobrenome}`,
+        expira: expira.toISOString(),
+        diasRestantes,
+        deviceSecret: novoSecret,
       })
+
+    } else if (deviceSecret) {
+      // ── VALIDAÇÃO V2: HMAC obrigatório ────────────────────────
+      if (!nonceValido) {
+        await registrarLog(licenca.id as string, ip, hwid, false, 'Nonce ausente em validação v2')
+        return NextResponse.json({ valido: false, motivo: 'Nonce obrigatório. Atualize o aplicativo.' })
+      }
+
+      if (!hmac || hmac === '') {
+        await registrarLog(licenca.id as string, ip, hwid, false, 'HMAC ausente')
+        return NextResponse.json({ valido: false, motivo: 'HMAC obrigatório. Atualize o aplicativo.' })
+      }
+
+      // Verifica HWID (hardware deve ser o mesmo)
+      if (licenca.hwid !== hwid) {
+        await registrarLog(licenca.id as string, ip, hwid, false, 'HWID não autorizado')
+        return NextResponse.json({
+          valido: false,
+          motivo: 'Esta licença está registrada em outro PC. Contate o suporte para trocar de PC.',
+        })
+      }
+
+      // Verifica HMAC — nonce já foi marcado como usado acima
+      const expectedHmac = computeHMAC(deviceSecret, nonce, hwid)
+      if (hmac !== expectedHmac) {
+        await registrarLog(licenca.id as string, ip, hwid, false, 'HMAC inválido')
+        return NextResponse.json({
+          valido: false,
+          motivo: 'Autenticação inválida. Contate o suporte.',
+        })
+      }
+
+    } else {
+      // ── COMPATIBILIDADE LEGADA: HWID salvo mas sem device_secret ──
+      // Cliente antigo sem suporte a HMAC — verificação simples de HWID
+      if (licenca.hwid !== hwid) {
+        await registrarLog(licenca.id as string, ip, hwid, false, 'HWID não autorizado (legado)')
+        return NextResponse.json({
+          valido: false,
+          motivo: 'Esta licença está registrada em outro PC. Contate o suporte para trocar de PC.',
+        })
+      }
     }
 
-    // 10. Registra IP e atualiza ultimo_acesso
+    // 10. Detecção de sinais de spoof (não bloqueia — apenas loga para análise)
+    const flags: string[] = []
+    if (/^0+$/.test(hwid)) flags.push('hwid_zerado')
+    if (hwid.length !== 32 && hwid.length !== 64) flags.push('hwid_tamanho_suspeito')
+
+    // Múltiplos HWIDs diferentes para a mesma licença na última hora
+    const { data: logsRecentes } = await supabaseAdmin
+      .from('licenca_logs')
+      .select('hwid')
+      .eq('licenca_id', licenca.id as string)
+      .neq('hwid', hwid)
+      .gte('criado_em', new Date(Date.now() - 3600 * 1000).toISOString())
+
+    const hwidsDistintos = new Set((logsRecentes || []).map(l => l.hwid)).size
+    if (hwidsDistintos >= 3) flags.push('multiplos_hwids_1h')
+
+    // 11. Registra IP, atualiza ultimo_acesso e loga
     await Promise.all([
-      supabaseAdmin.from('ip_registros').insert({ ip, usuario_id: (licenca as Record<string, unknown> & { usuario_id: string }).usuario_id, tipo: 'validacao_licenca' }),
+      supabaseAdmin.from('ip_registros').insert({
+        ip,
+        usuario_id: (licenca as Record<string, unknown> & { usuario_id: string }).usuario_id,
+        tipo: 'validacao_licenca',
+      }),
       supabaseAdmin.from('licencas').update({ ultimo_acesso: new Date().toISOString() }).eq('id', licenca.id),
-      registrarLog(licenca.id as string, ip, hwid, true, null),
+      registrarLog(licenca.id as string, ip, hwid, true, flags.length > 0 ? flags.join(',') : null),
     ])
 
-    // 11. Calcula dias restantes
+    // 12. Calcula dias restantes e retorna
     const expira = new Date(licenca.expira_em as string)
     const diasRestantes = Math.max(0, Math.ceil((expira.getTime() - Date.now()) / (1000 * 60 * 60 * 24)))
-    const usuario = licenca.usuarios as { nome: string; sobrenome: string }
+    const usuarioResp = licenca.usuarios as { nome: string; sobrenome: string }
 
     return NextResponse.json({
       valido: true,
-      nome: `${usuario.nome} ${usuario.sobrenome}`,
+      nome: `${usuarioResp.nome} ${usuarioResp.sobrenome}`,
       expira: expira.toISOString(),
       diasRestantes,
     })
@@ -166,7 +297,13 @@ export async function POST(req: NextRequest) {
   }
 }
 
-async function registrarLog(licencaId: string | null, ip: string, hwid: string, sucesso: boolean, motivo: string | null) {
+async function registrarLog(
+  licencaId: string | null,
+  ip: string,
+  hwid: string,
+  sucesso: boolean,
+  motivo: string | null,
+) {
   await supabaseAdmin.from('licenca_logs').insert({
     licenca_id: licencaId,
     ip,
