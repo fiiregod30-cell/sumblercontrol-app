@@ -128,3 +128,28 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
 
   return NextResponse.json({ ok: true, ticket: data })
 }
+
+export async function DELETE(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
+  if (!checkAdmin(req)) return NextResponse.json({ error: 'Acesso negado.' }, { status: 403 })
+
+  const { id } = await params
+
+  // Verifica que o ticket existe antes de deletar
+  const { data: ticket } = await supabaseAdmin
+    .from('tickets')
+    .select('id, assunto, nome')
+    .eq('id', id)
+    .single()
+
+  if (!ticket) return NextResponse.json({ error: 'Ticket não encontrado.' }, { status: 404 })
+
+  // Deleta o ticket — CASCADE remove ticket_mensagens e notificacoes automaticamente
+  const { error } = await supabaseAdmin
+    .from('tickets')
+    .delete()
+    .eq('id', id)
+
+  if (error) return NextResponse.json({ error: 'Erro ao deletar ticket.' }, { status: 500 })
+
+  return NextResponse.json({ ok: true })
+}

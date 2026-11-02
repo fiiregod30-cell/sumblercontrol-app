@@ -197,6 +197,23 @@ export default function AdminDashboard() {
     return () => { if (conversaPollingRef.current) clearInterval(conversaPollingRef.current) }
   }, [ticketAberto, aba, carregarConversa])
 
+  async function deletarTicket(id: string, nome: string, assunto: string) {
+    if (!confirm(`Excluir permanentemente o ticket "${assunto}" de ${nome}?\n\nEssa ação remove o ticket, todo o histórico de mensagens e as notificações do usuário. Não pode ser desfeita.`)) return
+    const res = await fetch(`/api/tickets/${id}`, {
+      method: 'DELETE',
+      credentials: 'include',
+    })
+    if (res.ok) {
+      setTicketAberto(null)
+      setTicketConversa([])
+      setTicketMsg('')
+      carregarDados()
+    } else {
+      const err = await res.json()
+      setTicketMsg('✗ ' + (err.error || 'Erro ao excluir ticket.'))
+    }
+  }
+
   async function mudarStatusTicket(id: string, status: string) {
     await fetch(`/api/tickets/${id}`, {
       method: 'PATCH',
@@ -738,7 +755,17 @@ export default function AdminDashboard() {
                     {/* Cabeçalho */}
                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                       <h3 style={{ fontSize: '15px', fontWeight: '700', margin: 0 }}>#{ticketAberto.id.slice(0,8).toUpperCase()}</h3>
-                      <button onClick={() => { setTicketAberto(null); setTicketConversa([]) }} style={{ background: 'none', border: 'none', color: '#647489', cursor: 'pointer', fontSize: '18px' }}>×</button>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                        <button
+                          onClick={() => deletarTicket(ticketAberto.id, ticketAberto.nome, ticketAberto.assunto)}
+                          title="Excluir ticket permanentemente"
+                          style={{ padding: '4px 10px', background: 'rgba(239,68,68,0.08)', border: '1px solid rgba(239,68,68,0.25)', borderRadius: '6px', color: '#EF4444', fontSize: '12px', fontWeight: '600', cursor: 'pointer' }}
+                          onMouseEnter={e => (e.currentTarget.style.background = 'rgba(239,68,68,0.16)')}
+                          onMouseLeave={e => (e.currentTarget.style.background = 'rgba(239,68,68,0.08)')}>
+                          🗑 Excluir
+                        </button>
+                        <button onClick={() => { setTicketAberto(null); setTicketConversa([]) }} style={{ background: 'none', border: 'none', color: '#647489', cursor: 'pointer', fontSize: '18px' }}>×</button>
+                      </div>
                     </div>
 
                     {/* Metadados */}
