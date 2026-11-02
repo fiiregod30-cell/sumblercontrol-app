@@ -1,7 +1,7 @@
 import jwt from 'jsonwebtoken'
 import bcrypt from 'bcryptjs'
 
-const JWT_SECRET = process.env.ADMIN_SECRET_KEY
+const JWT_SECRET = process.env.ADMIN_SECRET_KEY as string
 if (!JWT_SECRET) throw new Error('[auth] ADMIN_SECRET_KEY não está definida nas variáveis de ambiente')
 const JWT_EXPIRES = '7d'
 
@@ -22,12 +22,13 @@ export interface JWTPayload {
 }
 
 export function signToken(payload: JWTPayload): string {
-  return jwt.sign(payload, JWT_SECRET, { expiresIn: JWT_EXPIRES })
+  return jwt.sign(payload, JWT_SECRET as string, { expiresIn: JWT_EXPIRES })
 }
 
 export function verifyToken(token: string): JWTPayload | null {
   try {
-    return jwt.verify(token, JWT_SECRET) as JWTPayload
+    const decoded = jwt.verify(token, JWT_SECRET as string)
+    return decoded as JWTPayload
   } catch {
     return null
   }

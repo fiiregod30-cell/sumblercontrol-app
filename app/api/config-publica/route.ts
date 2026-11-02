@@ -4,7 +4,7 @@ import { supabaseAdmin } from '@/lib/supabase'
 export async function GET() {
   const { data } = await supabaseAdmin
     .from('config_site')
-    .select('preco, preco_semestral, preco_anual, produto_nome, imagem_url')
+    .select('preco, preco_semestral, preco_anual, produto_nome, imagem_url, discord_url')
     .eq('id', 1)
     .single()
 
@@ -14,6 +14,7 @@ export async function GET() {
     precoAnual: data?.preco_anual ?? 289.90,
     nome: data?.produto_nome ?? 'SumblerControl',
     imagem: data?.imagem_url || '/assets/SumblerControl.png',
+    discordUrl: data?.discord_url || '',
     // link_download removido — acessível apenas em /api/pagamento/status (autenticado)
   }, {
     headers: { 'Cache-Control': 'no-store' }

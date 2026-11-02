@@ -15,10 +15,15 @@ interface Licenca {
 }
 interface IpSuspeito { ip: string; totalUsuarios: number }
 interface IpBloqueado { id: string; ip: string; motivo: string; criado_em: string }
+interface Ticket {
+  id: string; nome: string; email: string; assunto: string
+  status: 'aberto' | 'em_andamento' | 'resolvido'; criado_em: string
+  respondido_em: string | null; mensagem?: string; resposta_admin?: string; usuario_id?: string
+}
 
 export default function AdminDashboard() {
   const router = useRouter()
-  const [aba, setAba] = useState<'dashboard'|'cupons'|'usuarios'|'vendas'|'configuracoes'|'licencas'|'ips'>('dashboard')
+  const [aba, setAba] = useState<'dashboard'|'cupons'|'usuarios'|'vendas'|'configuracoes'|'licencas'|'ips'|'tickets'|'chat'>('dashboard')
   const [stats, setStats] = useState<Stats>({ usuarios: 0, vendas: 0, receita: 0 })
   const [licencas, setLicencas] = useState<Licenca[]>([])
   const [ipSuspeitos, setIpSuspeitos] = useState<IpSuspeito[]>([])
@@ -28,6 +33,13 @@ export default function AdminDashboard() {
   const [novaLicencaDias, setNovaLicencaDias] = useState('30')
   const [licencaMsg, setLicencaMsg] = useState('')
   const [cupons, setCupons] = useState<Cupom[]>([])
+  const [tickets, setTickets] = useState<Ticket[]>([])
+  const [ticketFiltro, setTicketFiltro] = useState('todos')
+  const [ticketAberto, setTicketAberto] = useState<Ticket | null>(null)
+  const [ticketResposta, setTicketResposta] = useState('')
+  const [ticketMsg, setTicketMsg] = useState('')
+  const [chatMensagens, setChatMensagens] = useState<{id:string;nome:string;mensagem:string;criado_em:string}[]>([])
+  const [chatMsg, setChatMsg] = useState('')
   const [usuarios, setUsuarios] = useState<{id:string;nome:string;sobrenome:string;email:string;telefone:string;criado_em:string}[]>([])
   const [pedidos, setPedidos] = useState<{id:string;valor_original:number;valor_desconto:number;valor_final:number;status:string;criado_em:string;usuario_id:string;cupons:{codigo:string}|null}[]>([])
   const [novoCupom, setNovoCupom] = useState({ codigo: '', tipo: 'porcentagem', valor: '', usos_maximos: '', expira_em: '' })
@@ -59,6 +71,19 @@ export default function AdminDashboard() {
         const data = await res.json()
         setIpSuspeitos(data.suspeitos || [])
         setIpBloqueados(data.bloqueados || [])
+        return
+      }
+      if (aba === 'tickets') {
+        const res = await fetch(`/api/tickets?status=${ticketFiltro}`, { credentials: 'include' })
+        if (res.status === 401) { router.push('/admin'); return }
+        const data = await res.json()
+        setTickets(data.tickets || [])
+        return
+      }
+      if (aba === 'chat') {
+        const res = await fetch('/api/chat/mensagens', { credentials: 'include' })
+        const data = await res.json()
+        setChatMensagens(data.mensagens || [])
         return
       }
       const res = await fetch('/api/admin/dados?tipo=' + aba, { credentials: 'include' })
@@ -119,6 +144,40 @@ export default function AdminDashboard() {
     else setLicencaMsg('✗ ' + data.error)
   }
 
+  async function responderTicket() {
+    if (!ticketAberto) return
+    setTicketMsg('')
+    const res = await fetch(`/api/tickets/${ticketAberto.id}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      credentials: 'include',
+      body: JSON.stringify({ resposta_admin: ticketResposta, status: 'em_andamento' }),
+    })
+    if (res.ok) {
+      setTicketMsg('✓ Resposta salva!')
+      setTicketAberto(prev => prev ? { ...prev, resposta_admin: ticketResposta, status: 'em_andamento' } : null)
+      carregarDados()
+    } else setTicketMsg('✗ Erro ao salvar resposta.')
+  }
+
+  async function mudarStatusTicket(id: string, status: string) {
+    await fetch(`/api/tickets/${id}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      credentials: 'include',
+      body: JSON.stringify({ status }),
+    })
+    carregarDados()
+    if (ticketAberto?.id === id) setTicketAberto(prev => prev ? { ...prev, status: status as Ticket['status'] } : null)
+  }
+
+  async function limparChat() {
+    if (!confirm('Tem certeza que deseja apagar TODAS as mensagens do chat? Essa ação não pode ser desfeita.')) return
+    const res = await fetch('/api/chat/limpar', { method: 'DELETE', credentials: 'include' })
+    if (res.ok) { setChatMsg('✓ Chat limpo com sucesso!'); setChatMensagens([]) }
+    else setChatMsg('✗ Erro ao limpar chat.')
+  }
+
   async function banirIp(ip: string) {
     if (!confirm(`Banir IP ${ip}? Todas as licenças vinculadas serão desativadas.`)) return
     await fetch('/api/admin/ips/banir', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ ip, motivo: 'Múltiplos usuários' }) })
@@ -153,6 +212,8 @@ export default function AdminDashboard() {
     { id: 'vendas', label: '💰 Vendas' },
     { id: 'licencas', label: '🔑 Licenças' },
     { id: 'ips', label: '🌐 IPs' },
+    { id: 'tickets', label: '🎫 Tickets' },
+    { id: 'chat', label: '💬 Chat' },
     { id: 'configuracoes', label: '⚙️ Configurações' },
   ]
 
@@ -561,6 +622,135 @@ export default function AdminDashboard() {
                           <td style={{ padding: '10px 14px', fontSize: '13px', color: '#647489' }}>{new Date(b.criado_em).toLocaleDateString('pt-BR')}</td>
                           <td style={{ padding: '10px 14px' }}>
                             <button onClick={() => desbloquearIp(b.ip)} style={{ ...btnAcaoStyle, color: '#22C55E' }}>✅ Desbloquear</button>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                )}
+              </div>
+            </div>
+          )}
+
+          {/* ── TICKETS ── */}
+          {aba === 'tickets' && (
+            <div>
+              <h2 style={{ fontSize: '20px', fontWeight: '800', marginBottom: '24px' }}>🎫 Tickets de Suporte</h2>
+
+              {/* Filtros */}
+              <div style={{ display: 'flex', gap: '8px', marginBottom: '20px', flexWrap: 'wrap' }}>
+                {['todos', 'aberto', 'em_andamento', 'resolvido'].map(f => (
+                  <button key={f} onClick={() => { setTicketFiltro(f); setTicketAberto(null) }}
+                    style={{ padding: '6px 14px', background: ticketFiltro === f ? '#3B82F6' : '#151D2C', border: '1px solid #243044', borderRadius: '999px', color: ticketFiltro === f ? '#fff' : '#647489', fontSize: '12px', fontWeight: '600', cursor: 'pointer', textTransform: 'capitalize' }}>
+                    {f === 'todos' ? 'Todos' : f === 'aberto' ? '🔴 Aberto' : f === 'em_andamento' ? '🟡 Em andamento' : '✅ Resolvido'}
+                  </button>
+                ))}
+                <button onClick={carregarDados} style={{ padding: '6px 14px', background: '#151D2C', border: '1px solid #243044', borderRadius: '999px', color: '#647489', fontSize: '12px', cursor: 'pointer' }}>🔄 Atualizar</button>
+              </div>
+
+              <div style={{ display: 'grid', gridTemplateColumns: ticketAberto ? '1fr 1fr' : '1fr', gap: '16px' }}>
+                {/* Lista */}
+                <div style={{ background: '#111826', border: '1px solid #1E2939', borderRadius: '12px', overflow: 'hidden' }}>
+                  {tickets.length === 0 ? (
+                    <div style={{ padding: '32px', textAlign: 'center', color: '#647489', fontSize: '14px' }}>Nenhum ticket encontrado.</div>
+                  ) : (
+                    <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+                      <thead><tr style={{ background: '#151D2C' }}>
+                        {['Nome', 'Assunto', 'Status', 'Data', ''].map(h => (
+                          <th key={h} style={{ padding: '10px 14px', textAlign: 'left', fontSize: '11px', color: '#647489', fontWeight: '600' }}>{h}</th>
+                        ))}
+                      </tr></thead>
+                      <tbody>
+                        {tickets.map(t => (
+                          <tr key={t.id} onClick={() => { setTicketAberto(t); setTicketResposta(t.resposta_admin || ''); setTicketMsg('') }}
+                            style={{ borderTop: '1px solid #1E2939', cursor: 'pointer', background: ticketAberto?.id === t.id ? 'rgba(59,130,246,0.06)' : 'transparent' }}>
+                            <td style={{ padding: '10px 14px', fontSize: '13px' }}>{t.nome}</td>
+                            <td style={{ padding: '10px 14px', fontSize: '13px', color: '#647489' }}>{t.assunto}</td>
+                            <td style={{ padding: '10px 14px' }}>
+                              <span style={{ padding: '2px 8px', borderRadius: '999px', fontSize: '11px', fontWeight: '600',
+                                background: t.status === 'aberto' ? 'rgba(239,68,68,0.1)' : t.status === 'em_andamento' ? 'rgba(251,191,36,0.1)' : 'rgba(34,197,94,0.1)',
+                                color: t.status === 'aberto' ? '#EF4444' : t.status === 'em_andamento' ? '#FBBF24' : '#22C55E' }}>
+                                {t.status === 'aberto' ? 'Aberto' : t.status === 'em_andamento' ? 'Em andamento' : 'Resolvido'}
+                              </span>
+                            </td>
+                            <td style={{ padding: '10px 14px', fontSize: '12px', color: '#647489' }}>{new Date(t.criado_em).toLocaleDateString('pt-BR')}</td>
+                            <td style={{ padding: '10px 14px' }}>
+                              <span style={{ fontSize: '16px', color: '#3B82F6' }}>→</span>
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  )}
+                </div>
+
+                {/* Detalhe do ticket */}
+                {ticketAberto && (
+                  <div style={{ background: '#111826', border: '1px solid #1E2939', borderRadius: '12px', padding: '20px', display: 'flex', flexDirection: 'column', gap: '14px' }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                      <h3 style={{ fontSize: '15px', fontWeight: '700', margin: 0 }}>#{ticketAberto.id.slice(0,8).toUpperCase()}</h3>
+                      <button onClick={() => setTicketAberto(null)} style={{ background: 'none', border: 'none', color: '#647489', cursor: 'pointer', fontSize: '18px' }}>×</button>
+                    </div>
+                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px' }}>
+                      <div><p style={{ fontSize: '11px', color: '#647489', marginBottom: '2px' }}>Nome</p><p style={{ fontSize: '13px' }}>{ticketAberto.nome}</p></div>
+                      <div><p style={{ fontSize: '11px', color: '#647489', marginBottom: '2px' }}>E-mail</p><p style={{ fontSize: '13px' }}>{ticketAberto.email}</p></div>
+                      <div><p style={{ fontSize: '11px', color: '#647489', marginBottom: '2px' }}>Assunto</p><p style={{ fontSize: '13px' }}>{ticketAberto.assunto}</p></div>
+                      <div><p style={{ fontSize: '11px', color: '#647489', marginBottom: '2px' }}>Status</p>
+                        <select value={ticketAberto.status} onChange={e => mudarStatusTicket(ticketAberto.id, e.target.value)}
+                          style={{ padding: '4px 8px', background: '#151D2C', border: '1px solid #243044', borderRadius: '6px', color: '#F1F5FA', fontSize: '12px', cursor: 'pointer' }}>
+                          <option value="aberto">Aberto</option>
+                          <option value="em_andamento">Em andamento</option>
+                          <option value="resolvido">Resolvido</option>
+                        </select>
+                      </div>
+                    </div>
+                    <div>
+                      <p style={{ fontSize: '11px', color: '#647489', marginBottom: '6px' }}>Mensagem do cliente</p>
+                      <div style={{ background: '#151D2C', border: '1px solid #1E2939', borderRadius: '8px', padding: '12px', fontSize: '13px', lineHeight: 1.6, color: '#CBD5E1', whiteSpace: 'pre-wrap' }}>{ticketAberto.mensagem}</div>
+                    </div>
+                    <div>
+                      <p style={{ fontSize: '11px', color: '#647489', marginBottom: '6px' }}>Sua resposta</p>
+                      <textarea value={ticketResposta} onChange={e => setTicketResposta(e.target.value)} rows={4}
+                        placeholder="Digite a resposta para o cliente..." style={{ width: '100%', padding: '10px', background: '#151D2C', border: '1px solid #1E2939', borderRadius: '8px', color: '#F1F5FA', fontSize: '13px', resize: 'vertical', boxSizing: 'border-box', outline: 'none' }} />
+                    </div>
+                    {ticketMsg && <p style={{ fontSize: '12px', color: ticketMsg.startsWith('✓') ? '#22C55E' : '#EF4444', margin: 0 }}>{ticketMsg}</p>}
+                    <button onClick={responderTicket} style={{ padding: '10px', background: '#3B82F6', border: 'none', borderRadius: '8px', color: '#fff', fontSize: '13px', fontWeight: '700', cursor: 'pointer' }}>
+                      💾 Salvar Resposta
+                    </button>
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
+
+          {/* ── CHAT ── */}
+          {aba === 'chat' && (
+            <div>
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '24px' }}>
+                <h2 style={{ fontSize: '20px', fontWeight: '800', margin: 0 }}>💬 Chat de Suporte</h2>
+                <div style={{ display: 'flex', gap: '10px', alignItems: 'center' }}>
+                  <button onClick={carregarDados} style={{ padding: '8px 14px', background: '#151D2C', border: '1px solid #243044', borderRadius: '8px', color: '#647489', fontSize: '13px', cursor: 'pointer' }}>🔄 Atualizar</button>
+                  <button onClick={limparChat} style={{ padding: '8px 14px', background: 'rgba(239,68,68,0.1)', border: '1px solid rgba(239,68,68,0.3)', borderRadius: '8px', color: '#EF4444', fontSize: '13px', fontWeight: '600', cursor: 'pointer' }}>🗑️ Limpar Chat</button>
+                </div>
+              </div>
+              {chatMsg && <p style={{ fontSize: '13px', color: chatMsg.startsWith('✓') ? '#22C55E' : '#EF4444', marginBottom: '16px' }}>{chatMsg}</p>}
+              <div style={{ background: '#111826', border: '1px solid #1E2939', borderRadius: '12px', overflow: 'hidden' }}>
+                {chatMensagens.length === 0 ? (
+                  <div style={{ padding: '32px', textAlign: 'center', color: '#647489', fontSize: '14px' }}>Nenhuma mensagem no chat.</div>
+                ) : (
+                  <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+                    <thead><tr style={{ background: '#151D2C' }}>
+                      {['Usuário', 'Mensagem', 'Data/Hora'].map(h => (
+                        <th key={h} style={{ padding: '10px 14px', textAlign: 'left', fontSize: '11px', color: '#647489', fontWeight: '600' }}>{h}</th>
+                      ))}
+                    </tr></thead>
+                    <tbody>
+                      {chatMensagens.map(m => (
+                        <tr key={m.id} style={{ borderTop: '1px solid #1E2939' }}>
+                          <td style={{ padding: '10px 14px', fontSize: '13px', fontWeight: '600', whiteSpace: 'nowrap' }}>{m.nome}</td>
+                          <td style={{ padding: '10px 14px', fontSize: '13px', color: '#CBD5E1', maxWidth: '400px', wordBreak: 'break-word' }}>{m.mensagem}</td>
+                          <td style={{ padding: '10px 14px', fontSize: '12px', color: '#647489', whiteSpace: 'nowrap' }}>
+                            {new Date(m.criado_em).toLocaleString('pt-BR')}
                           </td>
                         </tr>
                       ))}

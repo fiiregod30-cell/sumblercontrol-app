@@ -1,9 +1,20 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { supabaseAdmin } from '@/lib/supabase'
 import { comparePassword, signToken } from '@/lib/auth'
+import { rateLimit } from '@/lib/rateLimit'
 
 export async function POST(req: NextRequest) {
   try {
+    // Rate limit: 5 tentativas por IP a cada 60 segundos
+    const ip = req.headers.get('x-forwarded-for')?.split(',')[0]?.trim() || 'unknown'
+    const rl = rateLimit(`login:${ip}`, 5, 60_000)
+    if (!rl.allowed) {
+      return NextResponse.json(
+        { error: 'Muitas tentativas. Aguarde 1 minuto e tente novamente.' },
+        { status: 429, headers: { 'Retry-After': String(Math.ceil(rl.resetIn / 1000)) } }
+      )
+    }
+
     const { login, senha } = await req.json()
 
     if (!login || !senha)
