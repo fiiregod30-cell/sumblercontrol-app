@@ -1,5 +1,5 @@
 'use client'
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef, useCallback } from 'react'
 import { useRouter } from 'next/navigation'
 
 interface Cupom {
@@ -20,6 +20,9 @@ interface Ticket {
   status: 'aberto' | 'em_andamento' | 'resolvido'; criado_em: string
   respondido_em: string | null; mensagem?: string; resposta_admin?: string; usuario_id?: string
 }
+interface TicketMensagem {
+  id: string; remetente: 'usuario' | 'admin'; mensagem: string; lida: boolean; criado_em: string
+}
 
 export default function AdminDashboard() {
   const router = useRouter()
@@ -38,6 +41,11 @@ export default function AdminDashboard() {
   const [ticketAberto, setTicketAberto] = useState<Ticket | null>(null)
   const [ticketResposta, setTicketResposta] = useState('')
   const [ticketMsg, setTicketMsg] = useState('')
+  // Conversa bidirecional
+  const [ticketConversa, setTicketConversa] = useState<TicketMensagem[]>([])
+  const [ticketConversaLoading, setTicketConversaLoading] = useState(false)
+  const conversaEndRef = useRef<HTMLDivElement>(null)
+  const conversaPollingRef = useRef<ReturnType<typeof setInterval> | null>(null)
   const [chatMensagens, setChatMensagens] = useState<{id:string;nome:string;mensagem:string;criado_em:string}[]>([])
   const [chatMsg, setChatMsg] = useState('')
   const [usuarios, setUsuarios] = useState<{id:string;nome:string;sobrenome:string;email:string;telefone:string;criado_em:string}[]>([])
@@ -145,20 +153,49 @@ export default function AdminDashboard() {
   }
 
   async function responderTicket() {
-    if (!ticketAberto) return
+    if (!ticketAberto || !ticketResposta.trim()) return
     setTicketMsg('')
-    const res = await fetch(`/api/tickets/${ticketAberto.id}`, {
-      method: 'PATCH',
+    // Usa o novo endpoint de mensagens para enviar via conversa
+    const res = await fetch(`/api/tickets/${ticketAberto.id}/mensagens`, {
+      method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       credentials: 'include',
-      body: JSON.stringify({ resposta_admin: ticketResposta, status: 'em_andamento' }),
+      body: JSON.stringify({ mensagem: ticketResposta.trim() }),
     })
     if (res.ok) {
-      setTicketMsg('✓ Resposta salva!')
-      setTicketAberto(prev => prev ? { ...prev, resposta_admin: ticketResposta, status: 'em_andamento' } : null)
+      setTicketMsg('✓ Resposta enviada!')
+      setTicketResposta('')
+      setTicketAberto(prev => prev ? { ...prev, resposta_admin: ticketResposta, status: prev.status === 'aberto' ? 'em_andamento' : prev.status } : null)
+      await carregarConversa(ticketAberto.id)
       carregarDados()
-    } else setTicketMsg('✗ Erro ao salvar resposta.')
+    } else {
+      const err = await res.json()
+      setTicketMsg('✗ ' + (err.error || 'Erro ao enviar resposta.'))
+    }
   }
+
+  const carregarConversa = useCallback(async (id: string) => {
+    setTicketConversaLoading(true)
+    try {
+      const res = await fetch(`/api/tickets/${id}/mensagens`, { credentials: 'include' })
+      if (!res.ok) return
+      const data = await res.json()
+      setTicketConversa(data.mensagens || [])
+      setTimeout(() => conversaEndRef.current?.scrollIntoView({ behavior: 'smooth' }), 50)
+    } catch {}
+    setTicketConversaLoading(false)
+  }, [])
+
+  // Inicia polling da conversa quando um ticket é aberto
+  useEffect(() => {
+    if (ticketAberto && aba === 'tickets') {
+      carregarConversa(ticketAberto.id)
+      conversaPollingRef.current = setInterval(() => carregarConversa(ticketAberto.id), 10_000)
+    } else {
+      if (conversaPollingRef.current) clearInterval(conversaPollingRef.current)
+    }
+    return () => { if (conversaPollingRef.current) clearInterval(conversaPollingRef.current) }
+  }, [ticketAberto, aba, carregarConversa])
 
   async function mudarStatusTicket(id: string, status: string) {
     await fetch(`/api/tickets/${id}`, {
@@ -673,7 +710,7 @@ export default function AdminDashboard() {
                       </tr></thead>
                       <tbody>
                         {tickets.map(t => (
-                          <tr key={t.id} onClick={() => { setTicketAberto(t); setTicketResposta(t.resposta_admin || ''); setTicketMsg('') }}
+                          <tr key={t.id} onClick={() => { setTicketAberto(t); setTicketResposta(''); setTicketMsg(''); setTicketConversa([]) }}
                             style={{ borderTop: '1px solid #1E2939', cursor: 'pointer', background: ticketAberto?.id === t.id ? 'rgba(59,130,246,0.06)' : 'transparent' }}>
                             <td style={{ padding: '10px 14px', fontSize: '13px' }}>{t.nome}</td>
                             <td style={{ padding: '10px 14px', fontSize: '13px', color: '#647489' }}>{t.assunto}</td>
@@ -698,14 +735,17 @@ export default function AdminDashboard() {
                 {/* Detalhe do ticket */}
                 {ticketAberto && (
                   <div style={{ background: '#111826', border: '1px solid #1E2939', borderRadius: '12px', padding: '20px', display: 'flex', flexDirection: 'column', gap: '14px' }}>
+                    {/* Cabeçalho */}
                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                       <h3 style={{ fontSize: '15px', fontWeight: '700', margin: 0 }}>#{ticketAberto.id.slice(0,8).toUpperCase()}</h3>
-                      <button onClick={() => setTicketAberto(null)} style={{ background: 'none', border: 'none', color: '#647489', cursor: 'pointer', fontSize: '18px' }}>×</button>
+                      <button onClick={() => { setTicketAberto(null); setTicketConversa([]) }} style={{ background: 'none', border: 'none', color: '#647489', cursor: 'pointer', fontSize: '18px' }}>×</button>
                     </div>
+
+                    {/* Metadados */}
                     <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px' }}>
-                      <div><p style={{ fontSize: '11px', color: '#647489', marginBottom: '2px' }}>Nome</p><p style={{ fontSize: '13px' }}>{ticketAberto.nome}</p></div>
-                      <div><p style={{ fontSize: '11px', color: '#647489', marginBottom: '2px' }}>E-mail</p><p style={{ fontSize: '13px' }}>{ticketAberto.email}</p></div>
-                      <div><p style={{ fontSize: '11px', color: '#647489', marginBottom: '2px' }}>Assunto</p><p style={{ fontSize: '13px' }}>{ticketAberto.assunto}</p></div>
+                      <div><p style={{ fontSize: '11px', color: '#647489', marginBottom: '2px' }}>Nome</p><p style={{ fontSize: '13px', margin: 0 }}>{ticketAberto.nome}</p></div>
+                      <div><p style={{ fontSize: '11px', color: '#647489', marginBottom: '2px' }}>E-mail</p><p style={{ fontSize: '13px', margin: 0 }}>{ticketAberto.email}</p></div>
+                      <div><p style={{ fontSize: '11px', color: '#647489', marginBottom: '2px' }}>Assunto</p><p style={{ fontSize: '13px', margin: 0 }}>{ticketAberto.assunto}</p></div>
                       <div><p style={{ fontSize: '11px', color: '#647489', marginBottom: '2px' }}>Status</p>
                         <select value={ticketAberto.status} onChange={e => mudarStatusTicket(ticketAberto.id, e.target.value)}
                           style={{ padding: '4px 8px', background: '#151D2C', border: '1px solid #243044', borderRadius: '6px', color: '#F1F5FA', fontSize: '12px', cursor: 'pointer' }}>
@@ -715,19 +755,50 @@ export default function AdminDashboard() {
                         </select>
                       </div>
                     </div>
+
+                    {/* Conversa */}
                     <div>
-                      <p style={{ fontSize: '11px', color: '#647489', marginBottom: '6px' }}>Mensagem do cliente</p>
-                      <div style={{ background: '#151D2C', border: '1px solid #1E2939', borderRadius: '8px', padding: '12px', fontSize: '13px', lineHeight: 1.6, color: '#CBD5E1', whiteSpace: 'pre-wrap' }}>{ticketAberto.mensagem}</div>
+                      <p style={{ fontSize: '11px', color: '#647489', marginBottom: '8px' }}>Conversa</p>
+                      <div style={{ background: '#0D1424', border: '1px solid #1E2939', borderRadius: '8px', padding: '12px', display: 'flex', flexDirection: 'column', gap: '10px', maxHeight: '280px', overflowY: 'auto' }}>
+                        {ticketConversaLoading && ticketConversa.length === 0 && (
+                          <p style={{ fontSize: '12px', color: '#647489', textAlign: 'center', margin: 0 }}>Carregando...</p>
+                        )}
+                        {!ticketConversaLoading && ticketConversa.length === 0 && (
+                          <p style={{ fontSize: '12px', color: '#647489', textAlign: 'center', margin: 0 }}>Nenhuma mensagem ainda.</p>
+                        )}
+                        {ticketConversa.map(m => {
+                          const isAdmin = m.remetente === 'admin'
+                          return (
+                            <div key={m.id} style={{ display: 'flex', flexDirection: 'column', alignItems: isAdmin ? 'flex-end' : 'flex-start', gap: '3px' }}>
+                              <span style={{ fontSize: '10px', color: isAdmin ? '#3B82F6' : '#647489' }}>
+                                {isAdmin ? '🛡 Você (admin)' : `👤 ${ticketAberto.nome}`} · {new Date(m.criado_em).toLocaleString('pt-BR', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' })}
+                              </span>
+                              <div style={{ maxWidth: '85%', padding: '8px 12px', borderRadius: isAdmin ? '12px 2px 12px 12px' : '2px 12px 12px 12px', background: isAdmin ? 'rgba(59,130,246,0.12)' : '#1E2939', color: '#F1F5FA', fontSize: '13px', lineHeight: 1.5, border: isAdmin ? '1px solid rgba(59,130,246,0.2)' : 'none', whiteSpace: 'pre-wrap', wordBreak: 'break-word' }}>
+                                {m.mensagem}
+                              </div>
+                            </div>
+                          )
+                        })}
+                        <div ref={conversaEndRef} />
+                      </div>
                     </div>
-                    <div>
-                      <p style={{ fontSize: '11px', color: '#647489', marginBottom: '6px' }}>Sua resposta</p>
-                      <textarea value={ticketResposta} onChange={e => setTicketResposta(e.target.value)} rows={4}
-                        placeholder="Digite a resposta para o cliente..." style={{ width: '100%', padding: '10px', background: '#151D2C', border: '1px solid #1E2939', borderRadius: '8px', color: '#F1F5FA', fontSize: '13px', resize: 'vertical', boxSizing: 'border-box', outline: 'none' }} />
-                    </div>
-                    {ticketMsg && <p style={{ fontSize: '12px', color: ticketMsg.startsWith('✓') ? '#22C55E' : '#EF4444', margin: 0 }}>{ticketMsg}</p>}
-                    <button onClick={responderTicket} style={{ padding: '10px', background: '#3B82F6', border: 'none', borderRadius: '8px', color: '#fff', fontSize: '13px', fontWeight: '700', cursor: 'pointer' }}>
-                      💾 Salvar Resposta
-                    </button>
+
+                    {/* Input de resposta */}
+                    {ticketAberto.status !== 'resolvido' ? (
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                        <textarea value={ticketResposta} onChange={e => setTicketResposta(e.target.value)} rows={3}
+                          placeholder="Digite a resposta para o cliente..."
+                          style={{ width: '100%', padding: '10px', background: '#151D2C', border: '1px solid #1E2939', borderRadius: '8px', color: '#F1F5FA', fontSize: '13px', resize: 'vertical', boxSizing: 'border-box', outline: 'none' }} />
+                        {ticketMsg && <p style={{ fontSize: '12px', color: ticketMsg.startsWith('✓') ? '#22C55E' : '#EF4444', margin: 0 }}>{ticketMsg}</p>}
+                        <button onClick={responderTicket} disabled={!ticketResposta.trim()} style={{ padding: '10px', background: !ticketResposta.trim() ? '#1E2939' : '#3B82F6', border: 'none', borderRadius: '8px', color: '#fff', fontSize: '13px', fontWeight: '700', cursor: !ticketResposta.trim() ? 'not-allowed' : 'pointer' }}>
+                          ➤ Enviar Resposta
+                        </button>
+                      </div>
+                    ) : (
+                      <div style={{ padding: '10px', background: 'rgba(34,197,94,0.08)', border: '1px solid rgba(34,197,94,0.2)', borderRadius: '8px', textAlign: 'center' }}>
+                        <p style={{ fontSize: '13px', color: '#22C55E', fontWeight: '600', margin: 0 }}>✅ Ticket resolvido</p>
+                      </div>
+                    )}
                   </div>
                 )}
               </div>

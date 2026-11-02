@@ -35,6 +35,15 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
   const { id } = await params
   const { status, resposta_admin } = await req.json()
 
+  // Busca ticket atual para saber o usuario_id e status anterior
+  const { data: ticketAtual } = await supabaseAdmin
+    .from('tickets')
+    .select('id, usuario_id, assunto, status')
+    .eq('id', id)
+    .single()
+
+  if (!ticketAtual) return NextResponse.json({ error: 'Ticket não encontrado.' }, { status: 404 })
+
   const updates: Record<string, unknown> = {}
   if (status) updates.status = status
   if (resposta_admin !== undefined) {
@@ -43,12 +52,79 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
     if (!status) updates.status = 'em_andamento'
   }
 
+  // Se está marcando como resolvido, registra quem fechou
+  if (status === 'resolvido') {
+    updates.encerrado_por = 'admin'
+  }
+
   const { data } = await supabaseAdmin
     .from('tickets')
     .update(updates)
     .eq('id', id)
     .select()
     .single()
+
+  // Efeitos colaterais assíncronos após update bem-sucedido
+  if (data && ticketAtual.usuario_id) {
+    const novoStatus = (updates.status as string) || ticketAtual.status
+
+    // Admin respondeu via campo legado (textarea antigo do painel)
+    if (resposta_admin !== undefined) {
+      // Insere no histórico de ticket_mensagens para o usuário ver no widget
+      await supabaseAdmin
+        .from('ticket_mensagens')
+        .insert({
+          ticket_id: id,
+          remetente: 'admin',
+          mensagem: resposta_admin,
+        })
+
+      // Cria notificação para o usuário
+      await supabaseAdmin
+        .from('notificacoes')
+        .insert({
+          usuario_id: ticketAtual.usuario_id,
+          ticket_id: id,
+          tipo: 'ticket_resposta',
+          titulo: `Nova resposta no seu ticket: ${ticketAtual.assunto}`,
+        })
+    }
+
+    // Ticket marcado como resolvido
+    if (novoStatus === 'resolvido' && ticketAtual.status !== 'resolvido') {
+      // Mensagem automática de encerramento no histórico
+      await supabaseAdmin
+        .from('ticket_mensagens')
+        .insert({
+          ticket_id: id,
+          remetente: 'admin',
+          mensagem: '✅ Ticket marcado como resolvido pela equipe de suporte. Se precisar de mais ajuda, abra um novo ticket.',
+          lida: false,
+        })
+
+      // Notificação de resolução
+      await supabaseAdmin
+        .from('notificacoes')
+        .insert({
+          usuario_id: ticketAtual.usuario_id,
+          ticket_id: id,
+          tipo: 'ticket_resolvido',
+          titulo: `Seu ticket foi resolvido: ${ticketAtual.assunto}`,
+        })
+    }
+
+    // Ticket reaberto
+    if (novoStatus !== 'resolvido' && ticketAtual.status === 'resolvido') {
+      await supabaseAdmin
+        .from('notificacoes')
+        .insert({
+          usuario_id: ticketAtual.usuario_id,
+          ticket_id: id,
+          tipo: 'ticket_reaberto',
+          titulo: `Seu ticket foi reaberto: ${ticketAtual.assunto}`,
+        })
+    }
+  }
 
   return NextResponse.json({ ok: true, ticket: data })
 }
