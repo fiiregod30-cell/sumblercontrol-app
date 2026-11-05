@@ -2,6 +2,8 @@
 --  SumblerControl — Schema do Banco de Dados
 --  Executar no Supabase SQL Editor
 -- ============================================================
+-- Para habilitar solicitações e revisão manual de reembolso, execute também
+-- database/refund-requests.sql após as tabelas de licenças e logs existirem.
 
 -- Tabela de usuários
 CREATE TABLE IF NOT EXISTS usuarios (

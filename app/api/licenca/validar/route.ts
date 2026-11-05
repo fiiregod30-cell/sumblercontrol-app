@@ -22,6 +22,24 @@ function computeHMAC(secret: string, nonce: string, hwid: string): string {
   return crypto.createHmac('sha256', secret).update(nonce + hwid).digest('hex')
 }
 
+async function reembolsoEmAnalise(pedidoId: unknown): Promise<boolean> {
+  if (typeof pedidoId !== 'string' || !pedidoId) return false
+
+  const { data, error } = await supabaseAdmin
+    .from('solicitacoes_reembolso')
+    .select('id')
+    .eq('pedido_id', pedidoId)
+    .in('status', ['em_analise', 'liberado_manual'])
+    .maybeSingle()
+
+  if (error) {
+    console.error('Erro ao verificar bloqueio de ativação por reembolso:', error)
+    throw new Error('Não foi possível verificar o status do reembolso.')
+  }
+
+  return Boolean(data)
+}
+
 export async function POST(req: NextRequest) {
   try {
     // 1. Verifica header de cliente obrigatório
@@ -150,6 +168,11 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ valido: false, motivo: 'Licença não encontrada.' })
     }
 
+    if (await reembolsoEmAnalise(licenca.pedido_id)) {
+      await registrarLog(licenca.id as string, ip, hwid, false, 'Reembolso em análise')
+      return NextResponse.json({ valido: false, motivo: 'Validação temporariamente pausada durante a análise do reembolso.' }, { status: 403 })
+    }
+
     // 7. Verifica se está ativa
     if (!licenca.ativa) {
       await registrarLog(licenca.id as string, ip, hwid, false, 'Licença desativada')
@@ -160,6 +183,11 @@ export async function POST(req: NextRequest) {
     if (new Date(licenca.expira_em as string) < new Date()) {
       await registrarLog(licenca.id as string, ip, hwid, false, 'Licença expirada')
       return NextResponse.json({ valido: false, motivo: 'Licença expirada. Renove sua assinatura.' })
+    }
+
+    if (await reembolsoEmAnalise(licenca.pedido_id)) {
+      await registrarLog(licenca.id as string, ip, hwid, false, 'Reembolso em análise')
+      return NextResponse.json({ valido: false, motivo: 'Validação temporariamente pausada durante a análise do reembolso.' }, { status: 403 })
     }
 
     // 9. HWID + HMAC — protocolo v2 obrigatório (sem compatibilidade legada)
@@ -190,6 +218,16 @@ export async function POST(req: NextRequest) {
         })
         .eq('id', licenca.id)
 
+      if (await reembolsoEmAnalise(licenca.pedido_id)) {
+        await supabaseAdmin
+          .from('licencas')
+          .update({ hwid: null, device_secret: null, hwid_registrado_em: null })
+          .eq('id', licenca.id)
+          .eq('hwid', hwid)
+        await registrarLog(licenca.id as string, ip, hwid, false, 'Reembolso em análise')
+        return NextResponse.json({ valido: false, motivo: 'Validação temporariamente pausada durante a análise do reembolso.' }, { status: 403 })
+      }
+
       // Registra acesso
       await Promise.all([
         supabaseAdmin.from('ip_registros').insert({
@@ -219,6 +257,11 @@ export async function POST(req: NextRequest) {
       if (!nonceValido) {
         await registrarLog(licenca.id as string, ip, hwid, false, 'Nonce ausente')
         return NextResponse.json({ valido: false, motivo: 'Atualize o aplicativo para continuar.' })
+      }
+
+      if (await reembolsoEmAnalise(licenca.pedido_id)) {
+        await registrarLog(licenca.id as string, ip, hwid, false, 'Reembolso em análise')
+        return NextResponse.json({ valido: false, motivo: 'Validação temporariamente pausada durante a análise do reembolso.' }, { status: 403 })
       }
 
       if (!hmac || hmac === '') {
@@ -293,6 +336,9 @@ export async function POST(req: NextRequest) {
 
   } catch (err) {
     console.error('Erro na validação de licença:', err)
+    if (err instanceof Error && err.message === 'Não foi possível verificar o status do reembolso.') {
+      return NextResponse.json({ valido: false, motivo: 'Serviço temporariamente indisponível. Tente novamente mais tarde.' }, { status: 503 })
+    }
     return NextResponse.json({ valido: false, motivo: 'Erro interno do servidor.' }, { status: 500 })
   }
 }

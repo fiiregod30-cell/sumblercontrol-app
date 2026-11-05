@@ -24,10 +24,28 @@ interface Ticket {
 interface TicketMensagem {
   id: string; remetente: 'usuario' | 'admin'; mensagem: string; lida: boolean; criado_em: string
 }
+interface SolicitacaoReembolso {
+  id: string
+  pedido_id: string
+  motivo: string
+  verificacao_uso: 'sem_uso_registrado' | 'uso_detectado' | 'inconclusivo'
+  status: 'em_analise' | 'liberado_manual' | 'negado' | 'reembolsado' | 'contestado'
+  nota_revisao: string | null
+  criado_em: string
+  usuarios: { nome: string; sobrenome: string; email: string } | null
+  pedidos: { valor_final: number; plano: string | null; status: string } | null
+  evidencias: {
+    licencasEncontradas: number
+    hwidRegistrado: boolean
+    ativacoesBemSucedidas: number
+    primeiraAtivacao: string | null
+    motivosAtivacao: string[]
+  }
+}
 
 export default function AdminDashboard() {
   const router = useRouter()
-  const [aba, setAba] = useState<'dashboard'|'cupons'|'usuarios'|'vendas'|'configuracoes'|'licencas'|'ips'|'tickets'|'chat'|'versoes'>('dashboard')
+  const [aba, setAba] = useState<'dashboard'|'cupons'|'usuarios'|'vendas'|'configuracoes'|'licencas'|'ips'|'tickets'|'chat'|'versoes'|'reembolsos'>('dashboard')
   const [stats, setStats] = useState<Stats>({ usuarios: 0, vendas: 0, receita: 0 })
   const [licencas, setLicencas] = useState<Licenca[]>([])
   const [ipSuspeitos, setIpSuspeitos] = useState<IpSuspeito[]>([])
@@ -46,6 +64,9 @@ export default function AdminDashboard() {
   const [versaoMsg, setVersaoMsg] = useState('')
   const [cupons, setCupons] = useState<Cupom[]>([])
   const [tickets, setTickets] = useState<Ticket[]>([])
+  const [solicitacoesReembolso, setSolicitacoesReembolso] = useState<SolicitacaoReembolso[]>([])
+  const [notasReembolso, setNotasReembolso] = useState<Record<string, string>>({})
+  const [mensagemReembolso, setMensagemReembolso] = useState('')
   const [ticketFiltro, setTicketFiltro] = useState('todos')
   const [ticketAberto, setTicketAberto] = useState<Ticket | null>(null)
   const [ticketResposta, setTicketResposta] = useState('')
@@ -109,6 +130,14 @@ export default function AdminDashboard() {
         setVersoes(await res.json())
         return
       }
+      if (aba === 'reembolsos') {
+        const res = await fetch('/api/admin/reembolsos', { credentials: 'include' })
+        if (res.status === 401) { router.push('/admin'); return }
+        const data = await res.json()
+        if (!res.ok) throw new Error(data.error || 'Não foi possível carregar as solicitações.')
+        setSolicitacoesReembolso(data.solicitacoes || [])
+        return
+      }
       const res = await fetch('/api/admin/dados?tipo=' + aba, { credentials: 'include' })
       if (res.status === 401) { router.push('/admin'); return }
       const data = await res.json()
@@ -116,7 +145,11 @@ export default function AdminDashboard() {
       if (aba === 'cupons') setCupons(data)
       if (aba === 'usuarios') setUsuarios(data)
       if (aba === 'vendas') setPedidos(data)
-    } catch { /* silencioso */ }
+    } catch (error) {
+      if (aba === 'reembolsos') {
+        setMensagemReembolso(error instanceof Error ? error.message : 'Falha ao carregar solicitações.')
+      }
+    }
   }
 
   async function criarCupom(e: React.FormEvent) {
@@ -158,6 +191,28 @@ export default function AdminDashboard() {
       carregarDados()
     } else {
       setVersaoMsg('✗ ' + data.error)
+    }
+  }
+
+  async function decidirReembolso(solicitacaoId: string, decisao: 'liberado_manual' | 'negado') {
+    setMensagemReembolso('')
+    const nota = notasReembolso[solicitacaoId]?.trim() || ''
+    try {
+      const res = await fetch('/api/admin/reembolsos', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify({ solicitacaoId, decisao, nota }),
+      })
+      const data = await res.json()
+      if (!res.ok) {
+        setMensagemReembolso(data.error || 'Não foi possível salvar a decisão.')
+        return
+      }
+      setMensagemReembolso('Decisão registrada. O reembolso financeiro continua manual no Mercado Pago.')
+      await carregarDados()
+    } catch {
+      setMensagemReembolso('Falha de comunicação ao salvar a decisão.')
     }
   }
 
@@ -311,6 +366,7 @@ export default function AdminDashboard() {
     { id: 'cupons', label: '🏷️ Cupons' },
     { id: 'usuarios', label: '👥 Usuários' },
     { id: 'vendas', label: '💰 Vendas' },
+    { id: 'reembolsos', label: '↩️ Reembolsos' },
     { id: 'licencas', label: '🔑 Licenças' },
     { id: 'versoes', label: '📦 Versões' },
     { id: 'ips', label: '🌐 IPs' },
@@ -497,6 +553,7 @@ export default function AdminDashboard() {
                               R$ {p.valor_original.toFixed(2)}
                             </span>
                           )}
+
                         </td>
                         <td style={{ padding: '12px 16px', fontSize: '13px' }}>
                           {p.valor_desconto > 0
@@ -521,6 +578,64 @@ export default function AdminDashboard() {
                   </tbody>
                 </table>
               </div>
+            </div>
+          )}
+
+          {aba === 'reembolsos' && (
+            <div>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px', gap: '12px', flexWrap: 'wrap' }}>
+                <h2 style={{ fontSize: '20px', fontWeight: '800' }}>↩️ Solicitações de reembolso</h2>
+                <button onClick={carregarDados} style={{ padding: '7px 12px', background: '#151D2C', border: '1px solid #243044', borderRadius: '6px', color: '#647489', cursor: 'pointer' }}>Atualizar</button>
+              </div>
+              <p style={{ color: '#94A3B8', fontSize: '13px', marginBottom: '16px' }}>
+                A liberação é apenas uma autorização para análise e processamento manual no Mercado Pago. Nenhum dinheiro é devolvido automaticamente.
+              </p>
+              {mensagemReembolso && <p role="status" style={{ color: '#FBBF24', marginBottom: '14px', fontSize: '13px' }}>{mensagemReembolso}</p>}
+              {solicitacoesReembolso.length === 0 ? (
+                <div style={{ background: '#111826', border: '1px solid #1E2939', borderRadius: '12px', padding: '32px', color: '#647489', textAlign: 'center' }}>Nenhuma solicitação encontrada.</div>
+              ) : (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
+                  {solicitacoesReembolso.map(s => (
+                    <section key={s.id} style={{ background: '#111826', border: '1px solid #1E2939', borderRadius: '12px', padding: '20px' }}>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', gap: '12px', flexWrap: 'wrap', marginBottom: '12px' }}>
+                        <div>
+                          <strong>{s.usuarios ? `${s.usuarios.nome} ${s.usuarios.sobrenome}` : 'Usuário indisponível'}</strong>
+                          <p style={{ color: '#647489', fontSize: '12px', marginTop: '3px' }}>{s.usuarios?.email || '—'} · Pedido #{s.pedido_id.slice(0, 8).toUpperCase()}</p>
+                        </div>
+                        <span style={{ color: s.status === 'em_analise' ? '#FBBF24' : '#94A3B8', fontSize: '12px' }}>
+                          {s.status.replaceAll('_', ' ')}
+                        </span>
+                      </div>
+                      <p style={{ fontSize: '13px', marginBottom: '8px' }}><strong>Motivo:</strong> {s.motivo}</p>
+                      <p style={{ color: '#94A3B8', fontSize: '12px', marginBottom: '8px' }}>
+                        Pedido: {s.pedidos ? `R$ ${Number(s.pedidos.valor_final).toFixed(2)} · ${s.pedidos.plano || 'plano não informado'} · ${s.pedidos.status}` : 'dados indisponíveis'}
+                      </p>
+                      <div style={{ background: '#151D2C', borderRadius: '8px', padding: '12px', color: '#CBD5E1', fontSize: '12px', marginBottom: '12px' }}>
+                        <strong>Evidências técnicas:</strong> {s.evidencias.licencasEncontradas} licença(s); HWID registrado: {s.evidencias.hwidRegistrado ? 'sim' : 'não'}; validações bem-sucedidas: {s.evidencias.ativacoesBemSucedidas}
+                        {s.evidencias.primeiraAtivacao && <span> · primeira ativação: {new Date(s.evidencias.primeiraAtivacao).toLocaleString('pt-BR')}</span>}
+                        {s.evidencias.motivosAtivacao.length > 0 && <span> · registros: {s.evidencias.motivosAtivacao.join(', ')}</span>}
+                        <p style={{ color: '#94A3B8', marginTop: '5px' }}>Resultado: {s.verificacao_uso.replaceAll('_', ' ')}</p>
+                      </div>
+                      {s.nota_revisao && <p style={{ color: '#94A3B8', fontSize: '12px', marginBottom: '12px' }}>Nota da revisão: {s.nota_revisao}</p>}
+                      {s.status === 'em_analise' && (
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                          <textarea
+                            value={notasReembolso[s.id] || ''}
+                            onChange={e => setNotasReembolso(current => ({ ...current, [s.id]: e.target.value }))}
+                            placeholder="Nota da análise (mínimo 5 caracteres)"
+                            maxLength={1000}
+                            style={{ width: '100%', minHeight: '70px', padding: '10px', background: '#0D1420', border: '1px solid #243044', borderRadius: '6px', color: '#F1F5FA', resize: 'vertical' }}
+                          />
+                          <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
+                            <button onClick={() => decidirReembolso(s.id, 'liberado_manual')} style={{ padding: '8px 12px', background: '#166534', border: 'none', borderRadius: '6px', color: '#fff', cursor: 'pointer' }}>Autorizar processamento manual</button>
+                            <button onClick={() => decidirReembolso(s.id, 'negado')} style={{ padding: '8px 12px', background: '#7F1D1D', border: 'none', borderRadius: '6px', color: '#fff', cursor: 'pointer' }}>Negar solicitação</button>
+                          </div>
+                        </div>
+                      )}
+                    </section>
+                  ))}
+                </div>
+              )}
             </div>
           )}
 

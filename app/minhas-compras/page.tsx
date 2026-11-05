@@ -6,10 +6,17 @@ import Link from 'next/link'
 interface Compra {
   id: string
   valor_final: number
+  status: string
   criado_em: string
   pago_em: string | null
   link_download: string | null
   plano: string | null
+}
+
+interface SolicitacaoReembolso {
+  pedido_id: string
+  status: 'em_analise' | 'liberado_manual' | 'negado' | 'reembolsado' | 'contestado'
+  nota_revisao?: string | null
 }
 
 interface VersaoAtual {
@@ -52,6 +59,11 @@ export default function MinhasComprasPage() {
   const [copiadoPedido, setCopiadoPedido] = useState<string | null>(null)
   const [versaoAtual, setVersaoAtual] = useState<VersaoAtual | null>(null)
   const [versoesBaixadas, setVersoesBaixadas] = useState<Set<string>>(new Set())
+  const [solicitacoesReembolso, setSolicitacoesReembolso] = useState<Record<string, SolicitacaoReembolso>>({})
+  const [reembolsoAberto, setReembolsoAberto] = useState<string | null>(null)
+  const [motivosReembolso, setMotivosReembolso] = useState<Record<string, string>>({})
+  const [mensagensReembolso, setMensagensReembolso] = useState<Record<string, string>>({})
+  const [reembolsoLoading, setReembolsoLoading] = useState<string | null>(null)
 
   useEffect(() => {
     fetch('/api/auth/me', { credentials: 'include' })
@@ -63,8 +75,18 @@ export default function MinhasComprasPage() {
 
     fetch('/api/minha-conta', { credentials: 'include' })
       .then(r => { if (r.status === 401) { router.push('/login'); return null } return r.json() })
-      .then(d => { if (!d) return; setCompras(d.pedidos.filter((p: { status: string }) => p.status === 'pago')) })
+      .then(d => { if (!d) return; setCompras(d.pedidos.filter((p: { status: string }) => p.status === 'pago' || p.status === 'cancelado')) })
       .finally(() => setLoading(false))
+
+    fetch('/api/reembolsos', { credentials: 'include' })
+      .then(r => r.json())
+      .then(d => {
+        const mapeadas = Object.fromEntries(
+          (d.solicitacoes || []).map((solicitacao: SolicitacaoReembolso) => [solicitacao.pedido_id, solicitacao])
+        )
+        setSolicitacoesReembolso(mapeadas)
+      })
+      .catch(() => {})
 
     fetch('/api/minha-licenca', { credentials: 'include' })
       .then(r => r.json())
@@ -109,6 +131,32 @@ export default function MinhasComprasPage() {
       credentials: 'include',
       body: JSON.stringify({ versaoId: versaoAtual.id }),
     }).then(() => setVersoesBaixadas(prev => new Set([...prev, versaoAtual.id])))
+  }
+
+  async function solicitarReembolso(pedidoId: string) {
+    setMensagensReembolso(current => ({ ...current, [pedidoId]: '' }))
+    setReembolsoLoading(pedidoId)
+    try {
+      const res = await fetch('/api/reembolsos', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify({ pedidoId, motivo: motivosReembolso[pedidoId] || '' }),
+      })
+      const data = await res.json()
+      if (!res.ok) {
+        setMensagensReembolso(current => ({ ...current, [pedidoId]: data.error || 'Não foi possível enviar a solicitação.' }))
+        return
+      }
+      const solicitacao: SolicitacaoReembolso = { pedido_id: pedidoId, status: data.solicitacao.status }
+      setSolicitacoesReembolso(current => ({ ...current, [pedidoId]: solicitacao }))
+      setReembolsoAberto(null)
+      setMensagensReembolso(current => ({ ...current, [pedidoId]: 'Solicitação enviada para análise.' }))
+    } catch {
+      setMensagensReembolso(current => ({ ...current, [pedidoId]: 'Falha de comunicação. Tente novamente.' }))
+    } finally {
+      setReembolsoLoading(null)
+    }
   }
 
   if (loading) {
@@ -274,7 +322,9 @@ export default function MinhasComprasPage() {
                     </div>
                     <div style={{ textAlign: 'right' }}>
                       <p style={{ fontSize: '18px', fontWeight: '800' }}>R$ {c.valor_final.toFixed(2)}</p>
-                      <span style={{ padding: '3px 8px', borderRadius: '999px', fontSize: '12px', background: 'rgba(34,197,94,0.1)', color: '#22C55E' }}>✓ Pago</span>
+                      <span style={{ padding: '3px 8px', borderRadius: '999px', fontSize: '12px', background: c.status === 'pago' ? 'rgba(34,197,94,0.1)' : 'rgba(239,68,68,0.1)', color: c.status === 'pago' ? '#22C55E' : '#EF4444' }}>
+                        {c.status === 'pago' ? '✓ Pago' : 'Pagamento revertido'}
+                      </span>
                     </div>
                   </div>
 
@@ -310,6 +360,59 @@ export default function MinhasComprasPage() {
                     <span style={{ fontSize: '11px', padding: '2px 8px', borderRadius: '4px', background: 'rgba(59,130,246,0.08)', color: '#3B82F6' }}>
                       ⏱ {dias} dias de acesso
                     </span>
+                  </div>
+
+                  <div style={{ marginTop: '14px', borderTop: '1px solid #1E2939', paddingTop: '12px' }}>
+                    {solicitacoesReembolso[c.id] ? (
+                      <>
+                        <p style={{ color: '#FBBF24', fontSize: '12px' }}>
+                          Solicitação: {
+                            solicitacoesReembolso[c.id].status === 'em_analise' ? 'em análise; a validação de acesso fica pausada enquanto ela é revisada.' :
+                            solicitacoesReembolso[c.id].status === 'liberado_manual' ? 'autorizada para processamento manual; aguarde o resultado do provedor de pagamento.' :
+                            solicitacoesReembolso[c.id].status === 'negado' ? 'não autorizada pelo site.' :
+                            solicitacoesReembolso[c.id].status === 'reembolsado' ? 'reembolso confirmado pelo provedor.' :
+                            'pagamento revertido ou contestado.'
+                          }
+                        </p>
+                        {solicitacoesReembolso[c.id].nota_revisao && (
+                          <p style={{ color: '#94A3B8', fontSize: '12px', marginTop: '5px' }}>Nota: {solicitacoesReembolso[c.id].nota_revisao}</p>
+                        )}
+                      </>
+                    ) : c.status === 'pago' ? (
+                      <>
+                        <button
+                          onClick={() => setReembolsoAberto(reembolsoAberto === c.id ? null : c.id)}
+                          style={{ padding: '7px 10px', background: '#151D2C', border: '1px solid #243044', borderRadius: '6px', color: '#94A3B8', fontSize: '12px', cursor: 'pointer' }}
+                        >
+                          Solicitar análise de reembolso
+                        </button>
+                        {reembolsoAberto === c.id && (
+                          <div style={{ marginTop: '10px' }}>
+                            <label htmlFor={`motivo-reembolso-${c.id}`} style={{ display: 'block', color: '#94A3B8', fontSize: '12px', marginBottom: '6px' }}>
+                              Explique o motivo (10 a 2000 caracteres)
+                            </label>
+                            <textarea
+                              id={`motivo-reembolso-${c.id}`}
+                              value={motivosReembolso[c.id] || ''}
+                              onChange={e => setMotivosReembolso(current => ({ ...current, [c.id]: e.target.value }))}
+                              maxLength={2000}
+                              style={{ width: '100%', minHeight: '80px', padding: '10px', background: '#0D1420', border: '1px solid #243044', borderRadius: '6px', color: '#F1F5FA', resize: 'vertical' }}
+                            />
+                            <p style={{ color: '#647489', fontSize: '11px', margin: '6px 0 10px' }}>
+                              O envio inicia uma análise e não realiza estorno automático. A decisão e o processamento devem observar os direitos aplicáveis ao consumidor.
+                            </p>
+                            <button
+                              onClick={() => solicitarReembolso(c.id)}
+                              disabled={reembolsoLoading === c.id}
+                              style={{ padding: '8px 12px', background: '#3B82F6', border: 'none', borderRadius: '6px', color: '#fff', fontSize: '12px', fontWeight: '600', cursor: reembolsoLoading === c.id ? 'wait' : 'pointer', opacity: reembolsoLoading === c.id ? 0.7 : 1 }}
+                            >
+                              {reembolsoLoading === c.id ? 'Enviando...' : 'Enviar solicitação'}
+                            </button>
+                          </div>
+                        )}
+                      </>
+                    ) : null}
+                    {mensagensReembolso[c.id] && <p role="status" style={{ color: '#94A3B8', fontSize: '12px', marginTop: '7px' }}>{mensagensReembolso[c.id]}</p>}
                   </div>
                 </div>
               )
