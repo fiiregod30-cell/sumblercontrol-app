@@ -11,41 +11,38 @@ function getIP(req: NextRequest): string {
 }
 
 function verifyWebhookSignature(req: NextRequest, rawBody: string): boolean {
-  const secret = process.env.MP_WEBHOOK_SECRET
+  const secret = process.env.MP_WEBHOOK_SECRET?.trim()
   if (!secret) {
-    console.warn('[WEBHOOK] MP_WEBHOOK_SECRET não definido — validação HMAC pulada')
-    return true
+    console.error('[WEBHOOK] MP_WEBHOOK_SECRET não definido — rejeitando notificação')
+    return false
   }
   try {
     const signatureHeader = req.headers.get('x-signature') || ''
     const tsMatch = signatureHeader.match(/ts=([^,]+)/)
-    const v1Match = signatureHeader.match(/v1=([^,\s]+)/)
-    if (!tsMatch || !v1Match) {
-      console.warn('[WEBHOOK] Header x-signature ausente ou malformado — permitindo passar')
-      return true
-    }
+    const v1Match = signatureHeader.match(/v1=([0-9a-f]{64})(?:,|$)/i)
+    if (!tsMatch || !v1Match) return false
+
     const ts = tsMatch[1].trim()
     const receivedHmac = v1Match[1].trim()
     const requestId = req.headers.get('x-request-id') || ''
-    let paymentId = ''
-    try {
-      const body = JSON.parse(rawBody)
-      paymentId = body?.data?.id?.toString() || ''
-    } catch { return true }
+    if (!requestId) return false
+
+    const body = JSON.parse(rawBody)
+    const paymentId = body?.data?.id?.toString() || ''
+    if (!paymentId) return false
+
     const manifest = `id:${paymentId};request-id:${requestId};ts:${ts}`
     const expectedHmac = crypto.createHmac('sha256', secret).update(manifest).digest('hex')
-    if (receivedHmac.length !== expectedHmac.length) return false
     return crypto.timingSafeEqual(Buffer.from(receivedHmac, 'hex'), Buffer.from(expectedHmac, 'hex'))
   } catch (err) {
-    console.error('[WEBHOOK] Erro na verificação HMAC — permitindo passar:', err)
-    return true
+    console.error('[WEBHOOK] Erro ao verificar assinatura do webhook:', err)
+    return false
   }
 }
 
 export async function POST(req: NextRequest) {
   try {
     const rawBody = await req.text()
-    console.log('[WEBHOOK] Recebido POST, body:', rawBody.slice(0, 200))
 
     if (!verifyWebhookSignature(req, rawBody)) {
       console.error('[WEBHOOK] Assinatura inválida — rejeitando')
@@ -67,40 +64,46 @@ export async function POST(req: NextRequest) {
     console.log('[WEBHOOK] Status no MP:', status)
 
     if (status !== 'approved') {
-      if (status === 'cancelled') {
-        const { data: pedidoCancelado, error: pedidoError } = await supabaseAdmin
+      if (['refunded', 'charged_back', 'cancelled', 'rejected'].includes(status || '')) {
+        const { data: pedido, error: pedidoError } = await supabaseAdmin
           .from('pedidos')
           .select('id')
           .eq('mp_payment_id', paymentId)
-          .eq('status', 'pendente')
           .single()
 
         if (pedidoError && pedidoError.code !== 'PGRST116')
           throw pedidoError
 
-        if (pedidoCancelado) {
-          const { error: cancelamentoError } = await supabaseAdmin
-            .rpc('cancelar_pedido_pendente', { p_pedido_id: pedidoCancelado.id, p_novo_status: 'expirado' })
+        if (pedido) {
+          const { error: reversaoError } = await supabaseAdmin
+            .rpc('reverter_pedido_pagamento', {
+              p_pedido_id: pedido.id,
+              p_status_pagamento_mp: status,
+            })
 
-          if (cancelamentoError)
-            throw cancelamentoError
+          if (reversaoError)
+            throw reversaoError
         }
       }
+
       return NextResponse.json({ received: true })
     }
 
-    const { data: pedido } = await supabaseAdmin
+    const { data: pedido, error: pedidoError } = await supabaseAdmin
       .from('pedidos')
-      .select('id, usuario_id, status, link_download, cupom_id, plano')
+      .select('id, usuario_id')
       .eq('mp_payment_id', paymentId)
       .single()
+
+    if (pedidoError && pedidoError.code !== 'PGRST116')
+      throw pedidoError
 
     if (!pedido) {
       return NextResponse.json({ received: true })
     }
 
     const { data: confirmado, error: confirmacaoError } = await supabaseAdmin
-      .rpc('confirmar_pedido_pago', { p_pedido_id: pedido.id })
+      .rpc('confirmar_pedido_pago_com_licenca', { p_pedido_id: pedido.id })
 
     if (confirmacaoError)
       throw confirmacaoError
@@ -110,22 +113,6 @@ export async function POST(req: NextRequest) {
     }
 
     console.log('[WEBHOOK] Pedido marcado como pago:', pedido.id)
-
-    // Cria licença nova e independente para este pedido
-    const diasPorPlano: Record<string, number> = { mensal: 30, semestral: 180, anual: 360 }
-    const dias = diasPorPlano[pedido.plano || 'mensal'] ?? 30
-    const expira_em = new Date(Date.now() + dias * 24 * 60 * 60 * 1000).toISOString()
-
-    await supabaseAdmin.from('licencas').insert({
-      usuario_id: pedido.usuario_id,
-      pedido_id: pedido.id,
-      tipo: null,       // usuário escolhe após pagamento
-      key: null,
-      ativa: true,
-      expira_em,
-    })
-
-    console.log('[WEBHOOK] Licença criada para pedido:', pedido.id, '| expira em:', expira_em)
 
     await supabaseAdmin.from('ip_registros').insert({
       ip,
@@ -140,8 +127,9 @@ export async function POST(req: NextRequest) {
       .single()
 
     if (user) {
-      await sendDownloadEmail(user.email, user.nome, pedido.id)
-      console.log('[WEBHOOK] E-mail enviado para:', user.email)
+      await sendDownloadEmail(user.email, user.nome, pedido.id).catch(err =>
+        console.error('[WEBHOOK] Erro ao enviar e-mail de entrega:', err)
+      )
     }
 
     return NextResponse.json({ received: true })

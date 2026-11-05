@@ -45,6 +45,7 @@ CREATE TABLE IF NOT EXISTS pedidos (
   valor_final     DECIMAL(10,2) NOT NULL,
   cupom_id        UUID REFERENCES cupons(id),
   cupom_reservado BOOLEAN NOT NULL DEFAULT FALSE,
+  motivo_reversao_pagamento TEXT,
   mp_payment_id   TEXT,
   status          TEXT DEFAULT 'pendente' CHECK (status IN ('pendente','pago','cancelado','expirado')),
   pix_qr_code     TEXT,
@@ -199,37 +200,122 @@ BEGIN
 END;
 $$;
 
-CREATE OR REPLACE FUNCTION confirmar_pedido_pago(p_pedido_id UUID)
+CREATE OR REPLACE FUNCTION confirmar_pedido_pago_com_licenca(p_pedido_id UUID)
 RETURNS BOOLEAN
 LANGUAGE plpgsql
 SECURITY DEFINER
 SET search_path = public
 AS $$
 DECLARE
-  v_cupom_id UUID;
-  v_cupom_reservado BOOLEAN;
+  v_pedido pedidos%ROWTYPE;
+  v_dias INTEGER;
 BEGIN
-  SELECT cupom_id, cupom_reservado
-  INTO v_cupom_id, v_cupom_reservado
+  SELECT *
+  INTO v_pedido
   FROM pedidos
   WHERE id = p_pedido_id
-    AND status = 'pendente'
   FOR UPDATE;
 
-  IF NOT FOUND THEN
+  IF NOT FOUND OR v_pedido.status NOT IN ('pendente', 'pago') THEN
     RETURN FALSE;
   END IF;
 
+  IF v_pedido.status = 'pendente' THEN
+    UPDATE pedidos
+    SET status = 'pago',
+        pago_em = NOW(),
+        cupom_reservado = FALSE
+    WHERE id = p_pedido_id;
+
+    IF v_pedido.cupom_id IS NOT NULL AND NOT v_pedido.cupom_reservado THEN
+      UPDATE cupons
+      SET usos_atuais = COALESCE(usos_atuais, 0) + 1
+      WHERE id = v_pedido.cupom_id;
+    END IF;
+  END IF;
+
+  IF EXISTS (SELECT 1 FROM licencas WHERE pedido_id = p_pedido_id) THEN
+    RETURN FALSE;
+  END IF;
+
+  v_dias := CASE v_pedido.plano
+    WHEN 'semestral' THEN 180
+    WHEN 'anual' THEN 360
+    ELSE 30
+  END;
+
+  INSERT INTO licencas (
+    usuario_id,
+    pedido_id,
+    tipo,
+    key,
+    ativa,
+    expira_em
+  )
+  VALUES (
+    v_pedido.usuario_id,
+    v_pedido.id,
+    NULL,
+    NULL,
+    TRUE,
+    NOW() + make_interval(days => v_dias)
+  );
+
+  RETURN TRUE;
+END;
+$$;
+
+CREATE OR REPLACE FUNCTION reverter_pedido_pagamento(
+  p_pedido_id UUID,
+  p_status_pagamento_mp TEXT
+)
+RETURNS BOOLEAN
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = public
+AS $$
+DECLARE
+  v_pedido pedidos%ROWTYPE;
+  v_novo_status TEXT;
+BEGIN
+  IF p_status_pagamento_mp IS NULL
+     OR p_status_pagamento_mp NOT IN ('refunded', 'charged_back', 'cancelled', 'rejected') THEN
+    RAISE EXCEPTION 'STATUS_PAGAMENTO_INVALIDO' USING ERRCODE = 'P0001';
+  END IF;
+
+  SELECT *
+  INTO v_pedido
+  FROM pedidos
+  WHERE id = p_pedido_id
+  FOR UPDATE;
+
+  IF NOT FOUND OR v_pedido.status NOT IN ('pendente', 'pago') THEN
+    RETURN FALSE;
+  END IF;
+
+  v_novo_status := CASE
+    WHEN v_pedido.status = 'pendente' THEN 'expirado'
+    ELSE 'cancelado'
+  END;
+
   UPDATE pedidos
-  SET status = 'pago',
-      pago_em = NOW(),
-      cupom_reservado = FALSE
+  SET status = v_novo_status,
+      cupom_reservado = FALSE,
+      motivo_reversao_pagamento = p_status_pagamento_mp
   WHERE id = p_pedido_id;
 
-  IF v_cupom_id IS NOT NULL AND NOT v_cupom_reservado THEN
+  IF v_pedido.cupom_id IS NOT NULL
+     AND (v_pedido.cupom_reservado OR v_pedido.status = 'pago') THEN
     UPDATE cupons
-    SET usos_atuais = COALESCE(usos_atuais, 0) + 1
-    WHERE id = v_cupom_id;
+    SET usos_atuais = GREATEST(COALESCE(usos_atuais, 0) - 1, 0)
+    WHERE id = v_pedido.cupom_id;
+  END IF;
+
+  IF v_pedido.status = 'pago' THEN
+    UPDATE licencas
+    SET ativa = FALSE
+    WHERE pedido_id = p_pedido_id
+      AND ativa = TRUE;
   END IF;
 
   RETURN TRUE;
@@ -238,10 +324,12 @@ $$;
 
 REVOKE ALL ON FUNCTION criar_pedido_com_cupom(UUID, NUMERIC, UUID, TEXT) FROM PUBLIC, anon, authenticated;
 REVOKE ALL ON FUNCTION cancelar_pedido_pendente(UUID, TEXT) FROM PUBLIC, anon, authenticated;
-REVOKE ALL ON FUNCTION confirmar_pedido_pago(UUID) FROM PUBLIC, anon, authenticated;
+REVOKE ALL ON FUNCTION confirmar_pedido_pago_com_licenca(UUID) FROM PUBLIC, anon, authenticated;
+REVOKE ALL ON FUNCTION reverter_pedido_pagamento(UUID, TEXT) FROM PUBLIC, anon, authenticated;
 GRANT EXECUTE ON FUNCTION criar_pedido_com_cupom(UUID, NUMERIC, UUID, TEXT) TO service_role;
 GRANT EXECUTE ON FUNCTION cancelar_pedido_pendente(UUID, TEXT) TO service_role;
-GRANT EXECUTE ON FUNCTION confirmar_pedido_pago(UUID) TO service_role;
+GRANT EXECUTE ON FUNCTION confirmar_pedido_pago_com_licenca(UUID) TO service_role;
+GRANT EXECUTE ON FUNCTION reverter_pedido_pagamento(UUID, TEXT) TO service_role;
 
 -- Row Level Security (RLS)
 ALTER TABLE usuarios ENABLE ROW LEVEL SECURITY;

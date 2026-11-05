@@ -14,60 +14,38 @@ async function getLinkDownloadAtual(): Promise<string | null> {
   return data?.link || null
 }
 
-async function processarPagamentoConfirmado(pedidoId: string, usuarioId: string): Promise<boolean> {
-  try {
-    console.log('[STATUS-FALLBACK] Processando:', pedidoId)
+async function processarPagamentoConfirmado(pedidoId: string, usuarioId: string): Promise<void> {
+  const { data: pedido, error: pedidoError } = await supabaseAdmin
+    .from('pedidos')
+    .select('id, usuario_id')
+    .eq('id', pedidoId)
+    .single()
 
-    const { data: pedido } = await supabaseAdmin
-      .from('pedidos')
-      .select('id, usuario_id, status, plano')
-      .eq('id', pedidoId)
-      .single()
+  if (pedidoError)
+    throw pedidoError
+  if (!pedido || pedido.usuario_id !== usuarioId)
+    throw new Error('Pedido não pertence ao usuário autenticado')
 
-    if (!pedido || pedido.usuario_id !== usuarioId) return false
+  const { data: confirmado, error: confirmacaoError } = await supabaseAdmin
+    .rpc('confirmar_pedido_pago_com_licenca', { p_pedido_id: pedidoId })
 
-    const { data: confirmado, error: confirmacaoError } = await supabaseAdmin
-      .rpc('confirmar_pedido_pago', { p_pedido_id: pedidoId })
+  if (confirmacaoError)
+    throw confirmacaoError
 
-    if (confirmacaoError)
-      throw confirmacaoError
+  if (!confirmado) return
 
-    if (!confirmado) return false
+  const { data: user, error: userError } = await supabaseAdmin
+    .from('usuarios')
+    .select('nome, email')
+    .eq('id', usuarioId)
+    .single()
 
-    // Cria licença nova e independente para este pedido
-    const diasPorPlano: Record<string, number> = { mensal: 30, semestral: 180, anual: 360 }
-    const dias = diasPorPlano[pedido.plano || 'mensal'] ?? 30
-    const expira_em = new Date(Date.now() + dias * 24 * 60 * 60 * 1000).toISOString()
+  if (userError)
+    throw userError
 
-    await supabaseAdmin.from('licencas').insert({
-      usuario_id: usuarioId,
-      pedido_id: pedidoId,
-      tipo: null,
-      key: null,
-      ativa: true,
-      expira_em,
-    })
-
-    console.log('[STATUS-FALLBACK] Licença criada, expira:', expira_em)
-
-    const { data: user } = await supabaseAdmin
-      .from('usuarios')
-      .select('nome, email')
-      .eq('id', usuarioId)
-      .single()
-
-    if (user) {
-      await sendDownloadEmail(user.email, user.nome, pedidoId).catch(err =>
-        console.error('[STATUS-FALLBACK] Erro ao enviar e-mail:', err)
-      )
-    }
-
-    console.log('[STATUS-FALLBACK] Processamento completo')
-    return true
-  } catch (err) {
-    console.error('[STATUS-FALLBACK] Erro crítico:', err)
-    return false
-  }
+  await sendDownloadEmail(user.email, user.nome, pedidoId).catch(err =>
+    console.error('[STATUS-FALLBACK] Erro ao enviar e-mail de entrega:', err)
+  )
 }
 
 export async function GET(req: NextRequest) {
@@ -81,50 +59,97 @@ export async function GET(req: NextRequest) {
     const pedidoId = req.nextUrl.searchParams.get('pedidoId')
     if (!pedidoId) return NextResponse.json({ error: 'pedidoId obrigatório' }, { status: 400 })
 
-    const { data: pedido } = await supabaseAdmin
+    const { data: pedido, error: pedidoError } = await supabaseAdmin
       .from('pedidos')
       .select('id, status, link_download, mp_payment_id')
       .eq('id', pedidoId)
       .eq('usuario_id', payload.id)
       .single()
 
+    if (pedidoError && pedidoError.code !== 'PGRST116')
+      throw pedidoError
     if (!pedido) return NextResponse.json({ error: 'Pedido não encontrado' }, { status: 404 })
 
     console.log('[STATUS] Pedido encontrado — id:', pedidoId, 'status:', pedido.status)
 
-    if (pedido.status === 'pago') {
+    if (!pedido.mp_payment_id) {
+      if (pedido.status === 'pago') {
+        const linkDownload = await getLinkDownloadAtual()
+        return NextResponse.json({ status: 'pago', linkDownload })
+      }
+
+      return NextResponse.json({ status: pedido.status, linkDownload: null })
+    }
+
+    let mpStatus: string | undefined
+    try {
+      mpStatus = await getPaymentStatus(pedido.mp_payment_id)
+    } catch (err) {
+      console.error('[STATUS] Erro ao consultar Mercado Pago:', err)
+      return NextResponse.json({ error: 'Não foi possível verificar o pagamento agora' }, { status: 503 })
+    }
+
+    console.log('[STATUS] Status no MP:', mpStatus)
+
+    if (mpStatus === 'approved') {
+      await processarPagamentoConfirmado(pedidoId, payload.id)
+
+      const { data: pedidoAtual, error: pedidoAtualError } = await supabaseAdmin
+        .from('pedidos')
+        .select('status')
+        .eq('id', pedidoId)
+        .eq('usuario_id', payload.id)
+        .single()
+
+      if (pedidoAtualError)
+        throw pedidoAtualError
+
+      if (pedidoAtual.status !== 'pago')
+        return NextResponse.json({ status: pedidoAtual.status, linkDownload: null })
+
+      const { data: licenca, error: licencaError } = await supabaseAdmin
+        .from('licencas')
+        .select('id')
+        .eq('pedido_id', pedidoId)
+        .limit(1)
+        .maybeSingle()
+
+      if (licencaError)
+        throw licencaError
+      if (!licenca)
+        throw new Error('Pagamento confirmado sem licença vinculada ao pedido')
+
       const linkDownload = await getLinkDownloadAtual()
       return NextResponse.json({ status: 'pago', linkDownload })
     }
 
-    if (pedido.status === 'pendente' && pedido.mp_payment_id) {
-      try {
-        const mpStatus = await getPaymentStatus(pedido.mp_payment_id)
-        console.log('[STATUS] Status no MP:', mpStatus)
+    if (['refunded', 'charged_back', 'cancelled', 'rejected'].includes(mpStatus || '')) {
+      const { error: reversaoError } = await supabaseAdmin
+        .rpc('reverter_pedido_pagamento', {
+          p_pedido_id: pedidoId,
+          p_status_pagamento_mp: mpStatus,
+        })
 
-        if (mpStatus === 'approved') {
-          await processarPagamentoConfirmado(pedidoId, payload.id)
-          const linkDownload = await getLinkDownloadAtual()
-          return NextResponse.json({ status: 'pago', linkDownload })
-        }
+      if (reversaoError)
+        throw reversaoError
 
-        if (mpStatus === 'cancelled' || mpStatus === 'rejected') {
-          const { error: cancelamentoError } = await supabaseAdmin
-            .rpc('cancelar_pedido_pendente', { p_pedido_id: pedidoId, p_novo_status: 'expirado' })
+      const { data: pedidoAtual, error: pedidoAtualError } = await supabaseAdmin
+        .from('pedidos')
+        .select('status')
+        .eq('id', pedidoId)
+        .eq('usuario_id', payload.id)
+        .single()
 
-          if (cancelamentoError)
-            throw cancelamentoError
+      if (pedidoAtualError)
+        throw pedidoAtualError
 
-          return NextResponse.json({ status: 'expirado' })
-        }
-
-        return NextResponse.json({ status: pedido.status, mpStatus })
-      } catch (err) {
-        console.error('[STATUS] Erro ao consultar MP:', err)
-      }
+      return NextResponse.json({ status: pedidoAtual.status, linkDownload: null })
     }
 
-    return NextResponse.json({ status: pedido.status, linkDownload: null })
+    if (pedido.status === 'pago')
+      return NextResponse.json({ status: 'verificando', linkDownload: null })
+
+    return NextResponse.json({ status: pedido.status, mpStatus, linkDownload: null })
   } catch (err) {
     console.error('[STATUS] Erro interno:', err)
     return NextResponse.json({ error: 'Erro interno' }, { status: 500 })
