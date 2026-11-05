@@ -14,26 +14,25 @@ async function getLinkDownloadAtual(): Promise<string | null> {
   return data?.link || null
 }
 
-async function processarPagamentoConfirmado(pedidoId: string, usuarioId: string) {
+async function processarPagamentoConfirmado(pedidoId: string, usuarioId: string): Promise<boolean> {
   try {
     console.log('[STATUS-FALLBACK] Processando:', pedidoId)
 
     const { data: pedido } = await supabaseAdmin
       .from('pedidos')
-      .select('id, usuario_id, status, link_download, cupom_id, plano')
+      .select('id, usuario_id, status, plano')
       .eq('id', pedidoId)
       .single()
 
-    if (!pedido || pedido.status === 'pago') return
+    if (!pedido || pedido.usuario_id !== usuarioId) return false
 
-    await supabaseAdmin
-      .from('pedidos')
-      .update({ status: 'pago', pago_em: new Date().toISOString() })
-      .eq('id', pedidoId)
+    const { data: confirmado, error: confirmacaoError } = await supabaseAdmin
+      .rpc('confirmar_pedido_pago', { p_pedido_id: pedidoId })
 
-    if (pedido.cupom_id) {
-      await supabaseAdmin.rpc('incrementar_uso_cupom', { cupom_id: pedido.cupom_id })
-    }
+    if (confirmacaoError)
+      throw confirmacaoError
+
+    if (!confirmado) return false
 
     // Cria licença nova e independente para este pedido
     const diasPorPlano: Record<string, number> = { mensal: 30, semestral: 180, anual: 360 }
@@ -64,8 +63,10 @@ async function processarPagamentoConfirmado(pedidoId: string, usuarioId: string)
     }
 
     console.log('[STATUS-FALLBACK] Processamento completo')
+    return true
   } catch (err) {
     console.error('[STATUS-FALLBACK] Erro crítico:', err)
+    return false
   }
 }
 
@@ -102,27 +103,18 @@ export async function GET(req: NextRequest) {
         console.log('[STATUS] Status no MP:', mpStatus)
 
         if (mpStatus === 'approved') {
-          // Verifica se licença já foi criada por outro processo (idempotência)
-          const { data: licExiste } = await supabaseAdmin
-            .from('licencas')
-            .select('id')
-            .eq('pedido_id', pedidoId)
-            .single()
-
-          if (!licExiste) {
-            await processarPagamentoConfirmado(pedidoId, payload.id)
-          } else {
-            await supabaseAdmin
-              .from('pedidos')
-              .update({ status: 'pago', pago_em: new Date().toISOString() })
-              .eq('id', pedidoId)
-          }
+          await processarPagamentoConfirmado(pedidoId, payload.id)
           const linkDownload = await getLinkDownloadAtual()
           return NextResponse.json({ status: 'pago', linkDownload })
         }
 
         if (mpStatus === 'cancelled' || mpStatus === 'rejected') {
-          await supabaseAdmin.from('pedidos').update({ status: 'expirado' }).eq('id', pedidoId)
+          const { error: cancelamentoError } = await supabaseAdmin
+            .rpc('cancelar_pedido_pendente', { p_pedido_id: pedidoId, p_novo_status: 'expirado' })
+
+          if (cancelamentoError)
+            throw cancelamentoError
+
           return NextResponse.json({ status: 'expirado' })
         }
 

@@ -57,7 +57,7 @@ export default function AdminDashboard() {
   const conversaPollingRef = useRef<ReturnType<typeof setInterval> | null>(null)
   const [chatMensagens, setChatMensagens] = useState<{id:string;nome:string;mensagem:string;criado_em:string}[]>([])
   const [chatMsg, setChatMsg] = useState('')
-  const [usuarios, setUsuarios] = useState<{id:string;nome:string;sobrenome:string;username:string|null;email:string;telefone:string;senha_hash:string;email_confirmado:boolean|null;ativo:boolean|null;criado_em:string}[]>([])
+  const [usuarios, setUsuarios] = useState<{id:string;nome:string;sobrenome:string;username:string|null;email:string;telefone:string;email_confirmado:boolean|null;ativo:boolean|null;criado_em:string}[]>([])
   const [pedidos, setPedidos] = useState<{id:string;valor_original:number;valor_desconto:number;valor_final:number;status:string;criado_em:string;usuario_id:string;cupons:{codigo:string}|null}[]>([])
   const [novoCupom, setNovoCupom] = useState({ codigo: '', tipo: 'porcentagem', valor: '', usos_maximos: '', expira_em: '' })
   const [cupomMsg, setCupomMsg] = useState('')
@@ -436,9 +436,9 @@ export default function AdminDashboard() {
             <div>
               <h2 style={{ fontSize: '20px', fontWeight: '800', marginBottom: '24px' }}>Usuários ({usuarios.length})</h2>
               <div style={{ background: '#111826', border: '1px solid #1E2939', borderRadius: '12px', overflowX: 'auto' }}>
-                <table style={{ width: '100%', borderCollapse: 'collapse', minWidth: '900px' }}>
+                <table style={{ width: '100%', borderCollapse: 'collapse', minWidth: '760px' }}>
                   <thead><tr style={{ background: '#151D2C' }}>
-                    {['Nome', 'Usuário', 'E-mail', 'Telefone', 'Senha (hash)', 'Status', 'Cadastro', 'Ação'].map(h => (
+                    {['Nome', 'Usuário', 'E-mail', 'Telefone', 'Status', 'Cadastro', 'Ação'].map(h => (
                       <th key={h} style={{ padding: '12px 16px', textAlign: 'left', fontSize: '12px', color: '#647489', fontWeight: '600', whiteSpace: 'nowrap' }}>{h}</th>
                     ))}
                   </tr></thead>
@@ -451,11 +451,6 @@ export default function AdminDashboard() {
                         </td>
                         <td style={{ padding: '12px 16px', fontSize: '13px', color: '#647489' }}>{u.email}</td>
                         <td style={{ padding: '12px 16px', fontSize: '13px', color: '#647489', whiteSpace: 'nowrap' }}>{u.telefone}</td>
-                        <td style={{ padding: '12px 16px', maxWidth: '180px' }}>
-                          <span title={u.senha_hash} style={{ fontFamily: 'monospace', fontSize: '11px', color: '#FBBF24', background: 'rgba(251,191,36,0.07)', padding: '2px 6px', borderRadius: '4px', display: 'inline-block', maxWidth: '160px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', cursor: 'help', verticalAlign: 'middle' }}>
-                            {u.senha_hash}
-                          </span>
-                        </td>
                         <td style={{ padding: '12px 16px', whiteSpace: 'nowrap' }}>
                           <span style={{ padding: '3px 8px', borderRadius: '999px', fontSize: '12px', background: u.ativo ? 'rgba(34,197,94,0.1)' : 'rgba(239,68,68,0.1)', color: u.ativo ? '#22C55E' : '#EF4444' }}>
                             {u.ativo ? 'Ativo' : 'Inativo'}

@@ -32,7 +32,7 @@ export async function GET(req: NextRequest) {
   }
 
   if (tipo === 'usuarios') {
-    const { data } = await supabaseAdmin.from('usuarios').select('id, nome, sobrenome, username, email, telefone, senha_hash, email_confirmado, ativo, criado_em').order('criado_em', { ascending: false })
+    const { data } = await supabaseAdmin.from('usuarios').select('id, nome, sobrenome, username, email, telefone, email_confirmado, ativo, criado_em').order('criado_em', { ascending: false })
     return NextResponse.json(data || [])
   }
 

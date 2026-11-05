@@ -68,7 +68,23 @@ export async function POST(req: NextRequest) {
 
     if (status !== 'approved') {
       if (status === 'cancelled') {
-        await supabaseAdmin.from('pedidos').update({ status: 'expirado' }).eq('mp_payment_id', paymentId)
+        const { data: pedidoCancelado, error: pedidoError } = await supabaseAdmin
+          .from('pedidos')
+          .select('id')
+          .eq('mp_payment_id', paymentId)
+          .eq('status', 'pendente')
+          .single()
+
+        if (pedidoError && pedidoError.code !== 'PGRST116')
+          throw pedidoError
+
+        if (pedidoCancelado) {
+          const { error: cancelamentoError } = await supabaseAdmin
+            .rpc('cancelar_pedido_pendente', { p_pedido_id: pedidoCancelado.id, p_novo_status: 'expirado' })
+
+          if (cancelamentoError)
+            throw cancelamentoError
+        }
       }
       return NextResponse.json({ received: true })
     }
@@ -79,21 +95,21 @@ export async function POST(req: NextRequest) {
       .eq('mp_payment_id', paymentId)
       .single()
 
-    if (!pedido || pedido.status === 'pago') {
+    if (!pedido) {
       return NextResponse.json({ received: true })
     }
 
-    // Marca pedido como pago
-    await supabaseAdmin
-      .from('pedidos')
-      .update({ status: 'pago', pago_em: new Date().toISOString() })
-      .eq('id', pedido.id)
+    const { data: confirmado, error: confirmacaoError } = await supabaseAdmin
+      .rpc('confirmar_pedido_pago', { p_pedido_id: pedido.id })
+
+    if (confirmacaoError)
+      throw confirmacaoError
+
+    if (!confirmado) {
+      return NextResponse.json({ received: true })
+    }
 
     console.log('[WEBHOOK] Pedido marcado como pago:', pedido.id)
-
-    if (pedido.cupom_id) {
-      await supabaseAdmin.rpc('incrementar_uso_cupom', { cupom_id: pedido.cupom_id })
-    }
 
     // Cria licença nova e independente para este pedido
     const diasPorPlano: Record<string, number> = { mensal: 30, semestral: 180, anual: 360 }
