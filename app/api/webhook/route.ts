@@ -23,15 +23,18 @@ function verifyWebhookSignature(req: NextRequest, rawBody: string): boolean {
     if (!tsMatch || !v1Match) return false
 
     const ts = tsMatch[1].trim()
+    if (!/^\d+$/.test(ts)) return false
+
     const receivedHmac = v1Match[1].trim()
     const requestId = req.headers.get('x-request-id') || ''
     if (!requestId) return false
 
     const body = JSON.parse(rawBody)
-    const paymentId = body?.data?.id?.toString() || ''
-    if (!paymentId) return false
+    const queryPaymentId = req.nextUrl.searchParams.get('data.id')
+    const bodyPaymentId = body?.data?.id?.toString() || ''
+    if (!queryPaymentId || !bodyPaymentId || queryPaymentId !== bodyPaymentId) return false
 
-    const manifest = `id:${paymentId};request-id:${requestId};ts:${ts}`
+    const manifest = `id:${queryPaymentId};request-id:${requestId};ts:${ts};`
     const expectedHmac = crypto.createHmac('sha256', secret).update(manifest).digest('hex')
     return crypto.timingSafeEqual(Buffer.from(receivedHmac, 'hex'), Buffer.from(expectedHmac, 'hex'))
   } catch (err) {
