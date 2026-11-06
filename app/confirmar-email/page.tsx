@@ -6,11 +6,11 @@ function ConfirmarContent() {
   const params = useSearchParams()
   const router = useRouter()
   const token = params.get('token')
-  const [status, setStatus] = useState<'loading' | 'ok' | 'erro'>('loading')
-  const [msg, setMsg] = useState('')
+  const [status, setStatus] = useState<'loading' | 'ok' | 'erro'>(() => token ? 'loading' : 'erro')
+  const [msg, setMsg] = useState(() => token ? '' : 'Token inválido.')
 
   useEffect(() => {
-    if (!token) { setStatus('erro'); setMsg('Token inválido.'); return }
+    if (!token) return
 
     fetch(`/api/auth/confirmar-email?token=${token}`)
       .then(res => {

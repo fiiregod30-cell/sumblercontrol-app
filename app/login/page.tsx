@@ -1,5 +1,5 @@
 'use client'
-import { useState, useEffect, Suspense } from 'react'
+import { useState, Suspense } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import Link from 'next/link'
 
@@ -7,17 +7,18 @@ function LoginContent() {
   const router = useRouter()
   const params = useSearchParams()
   const [form, setForm] = useState({ login: '', senha: '' })
-  const [erro, setErro] = useState('')
-  const [sucesso, setSucesso] = useState('')
+  const [erro, setErro] = useState(() => {
+    if (params.get('erro') === 'token-expirado') return 'Link expirado. Cadastre-se novamente.'
+    if (params.get('erro') === 'token-invalido') return 'Link inválido. Tente novamente.'
+    return ''
+  })
+  const [sucesso, setSucesso] = useState(() => {
+    if (params.get('confirmado')) return 'E-mail confirmado com sucesso! Faça login.'
+    if (params.get('erro') === 'token-usado') return 'Link já utilizado. Faça login normalmente.'
+    return ''
+  })
   const [loading, setLoading] = useState(false)
   const [naoConfirmado, setNaoConfirmado] = useState(false)
-
-  useEffect(() => {
-    if (params.get('confirmado')) setSucesso('E-mail confirmado com sucesso! Faça login.')
-    if (params.get('erro') === 'token-expirado') setErro('Link expirado. Cadastre-se novamente.')
-    if (params.get('erro') === 'token-usado') setSucesso('Link já utilizado. Faça login normalmente.')
-    if (params.get('erro') === 'token-invalido') setErro('Link inválido. Tente novamente.')
-  }, [params])
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()

@@ -18,7 +18,6 @@ function ObrigadoContent() {
   const pedidoId = params.get('pedido') || ''
 
   const [etapa, setEtapa] = useState<Etapa>('carregando')
-  const [licenca, setLicenca] = useState<LicencaInfo | null>(null)
   const [keyGerada, setKeyGerada] = useState('')
   const [downloadLink, setDownloadLink] = useState('')
   const [copiado, setCopiado] = useState(false)
@@ -63,8 +62,6 @@ function ObrigadoContent() {
         setEtapa('escolhendo')
         return
       }
-
-      setLicenca(lic)
 
       // Opção B: SEMPRE mostra tela de escolha, independente de ter tipo ou não
       // tipo = null → primeira compra ou renovação

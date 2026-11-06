@@ -1,7 +1,7 @@
 -- ============================================================
 --  hwid-v2.sql — Migração para o sistema HWID v2
 --  Aplicar no Supabase SQL Editor
---  Ordem: executar após schema.sql e add-email-confirm.sql
+--  Ordem: executar após schema.sql, core-tables.sql e add-email-confirm.sql
 -- ============================================================
 
 -- ── Migration 1: Colunas adicionais em licencas ───────────────
@@ -35,9 +35,11 @@ CREATE INDEX IF NOT EXISTS idx_nonces_expira_em
 
 -- RLS: apenas service_role acessa (backend usa supabaseAdmin)
 ALTER TABLE nonces ENABLE ROW LEVEL SECURITY;
-
+REVOKE ALL ON TABLE nonces FROM PUBLIC, anon, authenticated;
+GRANT ALL ON TABLE nonces TO service_role;
+DROP POLICY IF EXISTS "service_role_nonces" ON nonces;
 CREATE POLICY "service_role_nonces"
-  ON nonces FOR ALL TO service_role USING (true);
+  ON nonces FOR ALL TO service_role USING (true) WITH CHECK (true);
 
 -- ── Limpeza automática de nonces expirados (pg_cron) ─────────
 -- Requer extensão pg_cron habilitada no Supabase (Settings → Database → Extensions)

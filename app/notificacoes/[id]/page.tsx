@@ -68,9 +68,12 @@ export default function TicketChatPage() {
   }, [ticketId, router])
 
   useEffect(() => {
-    carregar()
+    const initialLoad = window.setTimeout(() => { void carregar() }, 0)
     pollingRef.current = setInterval(() => carregar(true), 5000)
-    return () => { if (pollingRef.current) clearInterval(pollingRef.current) }
+    return () => {
+      window.clearTimeout(initialLoad)
+      if (pollingRef.current) clearInterval(pollingRef.current)
+    }
   }, [carregar])
 
   // Scroll automático para última mensagem

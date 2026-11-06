@@ -41,7 +41,7 @@ export default function RegistroPage() {
           <p style={{ color: '#3B82F6', fontWeight: '600', fontSize: '15px', marginBottom: '24px' }}>{emailEnviado}</p>
           <div style={{ background: '#111826', border: '1px solid #1E2939', borderRadius: '12px', padding: '20px', marginBottom: '24px' }}>
             <p style={{ color: '#647489', fontSize: '13px', lineHeight: 1.7 }}>
-              Abra o e-mail e clique em <strong style={{ color: '#F1F5FA' }}>"Confirmar meu e-mail"</strong> para ativar sua conta. O link é válido por 24 horas.
+              Abra o e-mail e clique em <strong style={{ color: '#F1F5FA' }}>&quot;Confirmar meu e-mail&quot;</strong> para ativar sua conta. O link é válido por 24 horas.
             </p>
           </div>
           {/* Aviso spam expandido */}
@@ -49,8 +49,8 @@ export default function RegistroPage() {
             <p style={{ color: '#FBBF24', fontWeight: '700', fontSize: '13px', marginBottom: '10px' }}>⚠️ NÃO ENCONTROU O E-MAIL?</p>
             <ul style={{ listStyle: 'none', padding: 0, display: 'flex', flexDirection: 'column', gap: '6px' }}>
               <li style={{ color: '#647489', fontSize: '13px' }}>✓ Verifique a pasta <strong style={{ color: '#F1F5FA' }}>SPAM / Lixo Eletrônico</strong></li>
-              <li style={{ color: '#647489', fontSize: '13px' }}>✓ Procure por <strong style={{ color: '#F1F5FA' }}>"SumblerControl"</strong></li>
-              <li style={{ color: '#647489', fontSize: '13px' }}>✓ Marque como <strong style={{ color: '#F1F5FA' }}>"Não é spam"</strong> para receber futuros e-mails normalmente</li>
+              <li style={{ color: '#647489', fontSize: '13px' }}>✓ Procure por <strong style={{ color: '#F1F5FA' }}>&quot;SumblerControl&quot;</strong></li>
+              <li style={{ color: '#647489', fontSize: '13px' }}>✓ Marque como <strong style={{ color: '#F1F5FA' }}>&quot;Não é spam&quot;</strong> para receber futuros e-mails normalmente</li>
             </ul>
           </div>
           <p style={{ color: '#647489', fontSize: '13px' }}>

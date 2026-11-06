@@ -29,7 +29,7 @@ O SumblerControl é um **site de vendas de software** com sistema completo de:
 - **Node.js** — ambiente de execução do JavaScript no servidor (Next.js usa por baixo)
 - **bcryptjs** — criptografia de senhas (hash irreversível)
 - **jsonwebtoken (JWT)** — geração e verificação de tokens de autenticação
-- **nodemailer** — envio de e-mails via SMTP
+- **resend** — SDK oficial do Resend para envio de e-mails transacionais via domínio próprio
 - **mercadopago** — SDK oficial do Mercado Pago para gerar QR Code PIX
 
 ---
@@ -86,6 +86,7 @@ Você edita o código → git push → GitHub recebe → Vercel detecta → buil
 | `licencas` | Licenças de acesso ao software (key ou usuário+senha) |
 | `email_tokens` | Tokens de confirmação de e-mail (expiram em 24h) |
 | `licenca_logs` | Log de cada validação de licença (IP, HWID, resultado) |
+| `solicitacoes_reembolso` | Solicitações de análise, evidências técnicas e decisões administrativas de reembolso |
 | `ip_registros` | Registro de IPs por usuário (detecção de fraude) |
 | `ip_bloqueados` | IPs banidos pelo admin |
 | `config_site` | Configurações do site (preços, link de download, imagem) |
@@ -116,16 +117,27 @@ Você edita o código → git push → GitHub recebe → Vercel detecta → buil
 
 ---
 
-### 5. Gmail SMTP + Nodemailer
-**O que é:** Envio de e-mails usando a conta Gmail com "Senha de App".
+### 5. Resend + Domínio Próprio
+**O que é:** Serviço de envio de e-mails transacionais com domínio verificado.
 
 **Para que serve no projeto:**
 - Envia e-mail de confirmação de cadastro
 - Envia e-mail com key de licença após compra
-- Envia e-mail de download após pagamento confirmado
+- Envia e-mail com link de download após pagamento confirmado
 - Envia e-mail quando admin reseta o HWID de um usuário
 
-**Observação:** E-mails podem cair em spam sem domínio verificado. Para produção, recomenda-se usar Brevo (300 e-mails/dia grátis) ou Resend com domínio próprio.
+**Domínio verificado:** `sumblercontrol.com.br` — configurado com registros DKIM e SPF no Registro.br, garantindo entrega na caixa de entrada (sem spam).
+
+**Remetente:** `noreply@sumblercontrol.com.br`
+
+**Plano:** Gratuito — 3.000 e-mails/mês, 100/dia.
+
+**Registros DNS configurados no Registro.br:**
+| Tipo | Nome | Finalidade |
+|---|---|---|
+| `TXT` | `resend._domainkey` | DKIM — assina criptograficamente cada e-mail |
+| `CNAME` | `rsend` | SPF — autoriza o servidor Resend a enviar pelo domínio |
+| `CNAME` | `send` | SPF — rota secundária de envio |
 
 ---
 
@@ -158,6 +170,7 @@ site-next/
 │       ├── admin/cupons/         ← POST/PATCH: gerenciar cupons
 │       ├── admin/config/         ← GET/PATCH: configurações do site
 │       ├── admin/licencas/       ← CRUD de licenças
+│       ├── admin/reembolsos/     ← GET/POST: análise administrativa de reembolsos
 │       ├── admin/ips/            ← Monitoramento de IPs
 │       ├── cupom/validar/        ← POST: validar cupom em tempo real
 │       ├── pagamento/criar/      ← POST: gerar QR Code PIX
@@ -165,6 +178,7 @@ site-next/
 │       ├── webhook/              ← POST: confirmação do Mercado Pago
 │       ├── licenca/validar/      ← POST: validação de licença (chamado pelo .exe)
 │       ├── licenca/escolher-tipo/← POST: definir key ou usuário+senha
+│       ├── reembolsos/           ← GET/POST: solicitar e consultar reembolsos
 │       ├── minha-licenca/        ← GET: dados da licença do usuário
 │       ├── minha-conta/          ← GET: perfil + pedidos
 │       └── config-publica/       ← GET: preços públicos (sem auth)
@@ -203,8 +217,9 @@ site-next/
 │    │ Vercel chama API do MP para gerar PIX                         │
 │    │ MP chama Vercel (webhook) quando pagamento confirmado         │
 │    ↓                                                                │
-│  GMAIL SMTP (e-mails)                                               │
-│    │ Vercel envia e-mails via nodemailer                           │
+│  RESEND (e-mails)                                                   │
+│    │ Vercel envia e-mails via SDK do Resend                        │
+│    │ Domínio sumblercontrol.com.br verificado (DKIM + SPF)         │
 │    ↓ chega ao usuário                                               │
 │  USUÁRIO FINAL (browser)                                            │
 └─────────────────────────────────────────────────────────────────────┘
@@ -256,11 +271,19 @@ site-next/
 2. Mercado Pago envia POST para `https://sumblercontrol-app.vercel.app/api/webhook`
 3. Backend consulta o status do pagamento diretamente na API do MP (segurança dupla)
 4. Se aprovado:
-   - Pedido marcado como "pago" no banco
-   - Cupom incrementado se foi usado
-   - Licença criada (nova) ou renovada (se usuário já tinha)
+   - O backend confere o pagamento consultando o Mercado Pago; não confia somente no corpo do webhook ou no navegador
+   - O webhook valida a assinatura HMAC do Mercado Pago e confere que o identificador assinado corresponde ao pagamento notificado
+   - Uma função transacional no PostgreSQL marca o pedido como pago e cria a licença de modo idempotente
+   - O uso do cupom é confirmado uma única vez; reservas de pedidos pendentes são liberadas quando o pagamento é cancelado/expira ou revertido
    - E-mail de confirmação enviado com link de download
 5. Frontend detecta o pagamento via polling → redireciona para `/obrigado`
+
+### Integridade de cupons e reversões de pagamento
+- A criação do pedido e a reserva do cupom são feitas no banco em uma operação atômica: pedidos concorrentes não podem ultrapassar o limite do cupom.
+- Se um pedido pendente for cancelado/expirar, a reserva é liberada. Ao confirmar o pagamento, o consumo é consolidado sem duplicidade.
+- O webhook e a consulta de status usam o estado confirmado diretamente pelo Mercado Pago. O navegador não decide se uma compra foi paga.
+- Ao confirmar uma reversão pelo provedor (por exemplo, reembolso ou contestação), o pedido é atualizado e a licença vinculada é desativada. Uma solicitação aberta é atualizada conforme o status recebido.
+- A assinatura do webhook é verificada no servidor usando o segredo configurado em `MP_WEBHOOK_SECRET`; notificações sem assinatura válida não devem confirmar compras.
 
 ---
 
@@ -290,6 +313,39 @@ site-next/
   → sem internet: não abre (sem cache offline)
 ```
 
+### Protocolo de ativação e registro de uso
+- O protocolo atual exige um `nonce` de uso único e HMAC-SHA256 com o segredo do dispositivo; o protocolo legado sem esses controles foi removido.
+- Na primeira ativação bem-sucedida, o backend vincula o HWID à licença e grava um registro `licenca_logs` com `sucesso = true` e motivo `primeira_ativacao`.
+- Validações subsequentes que passam pelas verificações também são registradas como bem-sucedidas. O histórico é consultado para a análise de reembolsos, inclusive se o HWID da licença tiver sido posteriormente resetado.
+- A escolha do método de acesso (KEY ou usuário/senha), por si só, não significa que houve ativação. O sinal principal é a validação bem-sucedida registrada pelo servidor.
+
+---
+
+## Solicitação e Análise de Reembolsos
+
+O fluxo registra a solicitação, reúne sinais de uso e permite uma decisão administrativa. **Não envia dinheiro automaticamente** e não substitui a análise dos direitos aplicáveis ao consumidor.
+
+### Passo a passo
+1. O cliente autenticado abre **Minhas Compras**, seleciona um pedido elegível e explica o motivo. A API confere a sessão, a titularidade do pedido e o estado pago no banco.
+2. O banco permite uma solicitação por pedido e cria o registro de forma transacional. Isso evita duplicidades mesmo com requisições simultâneas.
+3. O servidor consulta as licenças do pedido, os HWIDs e o histórico de validações bem-sucedidas. A classificação pode ser `sem_uso_registrado`, `uso_detectado` ou `inconclusivo`.
+4. Enquanto a solicitação está `em_analise` ou `liberado_manual`, novas validações da licença são temporariamente pausadas. O erro ao consultar esse estado também pausa a validação, em vez de liberar o acesso por falha.
+5. O administrador revisa o motivo e as evidências em **Admin → Reembolsos**, registra uma nota e decide negar ou autorizar o processamento manual. A autorização não processa o pagamento.
+6. Uma autorização manual só é aceita se o pedido continuar pago, existirem licenças relacionadas e a revisão atualizada não encontrar uma ativação bem-sucedida nem um HWID registrado. Ausência de dados ou evidência inconclusiva não libera aprovação.
+7. O administrador processa o reembolso no Mercado Pago. A confirmação recebida do provedor é que atualiza o pedido, marca a solicitação como reembolsada/contestada quando aplicável e desativa a licença.
+
+### Estados registrados
+| Campo | Valores | Significado |
+|---|---|---|
+| `verificacao_uso` | `sem_uso_registrado`, `uso_detectado`, `inconclusivo` | Resultado técnico da conferência de licença, HWID e logs |
+| `status` | `em_analise`, `liberado_manual`, `negado`, `reembolsado`, `contestado` | Etapa administrativa/provedor; `liberado_manual` não significa que o dinheiro já foi devolvido |
+
+### Segurança e operação
+- A tabela `solicitacoes_reembolso` tem unicidade por pedido e RLS habilitada; acesso às operações é feito no servidor com `service_role`, nunca diretamente pelo browser.
+- As funções SQL `solicitar_reembolso` e `revisar_solicitacao_reembolso` verificam propriedade/estado, registram evidências e protegem as transições com bloqueios transacionais.
+- A aplicação da migração está em `database/refund-requests.sql`. Ela deve ser executada no Supabase depois da existência das tabelas `pedidos`, `licencas`, `licenca_logs` e `admins`.
+- Para cumprir direitos do consumidor e os termos do Mercado Pago, a política comercial deve ser revisada juridicamente. O registro de uso é evidência técnica para análise, não uma decisão jurídica automática.
+
 ---
 
 ## Variáveis de Ambiente Necessárias
@@ -307,9 +363,8 @@ MP_PUBLIC_KEY=APP_USR-...
 MP_ACCESS_TOKEN=APP_USR-...
 MP_WEBHOOK_SECRET=...
 
-# Gmail SMTP
-GMAIL_USER=seu@gmail.com
-GMAIL_APP_PASSWORD=xxxx xxxx xxxx xxxx
+# Resend
+RESEND_API_KEY=re_xxxxxxxxxxxx
 
 # Site
 NEXT_PUBLIC_SITE_URL=https://seusite.vercel.app
@@ -335,7 +390,8 @@ typescript            # Tipagem
 @supabase/supabase-js # Cliente do banco de dados
 bcryptjs              # Hash de senhas
 jsonwebtoken          # Tokens JWT de sessão
-nodemailer            # Envio de e-mails
+nodemailer            # Envio de e-mails (substituído pelo Resend)
+resend                # Envio de e-mails transacionais com domínio próprio
 mercadopago           # PIX e pagamentos
 @types/bcryptjs       # Tipos TypeScript
 @types/jsonwebtoken   # Tipos TypeScript
@@ -425,11 +481,11 @@ Supabase (PostgreSQL)
 Vercel → mercadopago SDK → Mercado Pago API
 Mercado Pago → POST webhook → Vercel
 
-Vercel → nodemailer SMTP → Gmail → Usuário
+Vercel → resend SDK → Resend API → sumblercontrol.com.br → Usuário
 ```
 
 ---
 
 *Documentação criada em: Outubro/Novembro 2026*
 *Projeto: SumblerControl — Site de Vendas de Software*
-*Stack: Next.js 16 + Supabase + Vercel + Mercado Pago + Gmail SMTP*
+*Stack: Next.js 16 + Supabase + Vercel + Mercado Pago + Resend*

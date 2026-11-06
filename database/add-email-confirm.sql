@@ -16,5 +16,9 @@ CREATE INDEX IF NOT EXISTS idx_email_tokens_token ON email_tokens(token);
 CREATE INDEX IF NOT EXISTS idx_email_tokens_usuario ON email_tokens(usuario_id);
 
 -- Policy para service_role
-CREATE POLICY "service_role_all_email_tokens" ON email_tokens FOR ALL TO service_role USING (true);
 ALTER TABLE email_tokens ENABLE ROW LEVEL SECURITY;
+REVOKE ALL ON TABLE email_tokens FROM PUBLIC, anon, authenticated;
+GRANT ALL ON TABLE email_tokens TO service_role;
+DROP POLICY IF EXISTS "service_role_all_email_tokens" ON email_tokens;
+CREATE POLICY "service_role_all_email_tokens"
+  ON email_tokens FOR ALL TO service_role USING (true) WITH CHECK (true);

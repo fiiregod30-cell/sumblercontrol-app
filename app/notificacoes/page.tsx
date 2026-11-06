@@ -121,11 +121,14 @@ export default function SuportePage() {
       .then(d => { if (!d.logado) router.push('/login') })
       .catch(() => router.push('/login'))
 
-    carregarTudo()
+    const initialLoad = window.setTimeout(() => { void carregarTudo() }, 0)
 
     // Polling de 5s — atualiza tickets e notificações em tempo real
     pollingRef.current = setInterval(() => carregarTudo(true), 5_000)
-    return () => { if (pollingRef.current) clearInterval(pollingRef.current) }
+    return () => {
+      window.clearTimeout(initialLoad)
+      if (pollingRef.current) clearInterval(pollingRef.current)
+    }
   }, [carregarTudo, router])
 
   // Marca notificações como lidas ao entrar na página

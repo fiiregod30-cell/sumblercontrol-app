@@ -56,7 +56,7 @@ export async function POST(req: NextRequest) {
       .eq('id', payload.id)
 
     return NextResponse.json({ ok: true, avatar_url: avatarUrl })
-  } catch (e) {
+  } catch {
     return NextResponse.json({ error: 'Erro interno.' }, { status: 500 })
   }
 }

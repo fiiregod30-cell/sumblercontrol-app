@@ -86,9 +86,7 @@ export default function AdminDashboard() {
   const [configMsg, setConfigMsg] = useState('')
   const [configLoading, setConfigLoading] = useState(false)
 
-  useEffect(() => { carregarDados() }, [aba])
-
-  async function carregarDados() {
+  const carregarDados = useCallback(async () => {
     try {
       if (aba === 'configuracoes') {
         const res = await fetch('/api/admin/config', { credentials: 'include' })
@@ -150,7 +148,9 @@ export default function AdminDashboard() {
         setMensagemReembolso(error instanceof Error ? error.message : 'Falha ao carregar solicitações.')
       }
     }
-  }
+  }, [aba, router, ticketFiltro])
+
+  useEffect(() => { void Promise.resolve().then(carregarDados) }, [carregarDados])
 
   async function criarCupom(e: React.FormEvent) {
     e.preventDefault(); setCupomMsg('')

@@ -4,7 +4,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { supabaseAdmin } from '@/lib/supabase'
 import { verifyToken } from '@/lib/auth'
-import { rateLimit } from '@/lib/rateLimit'
 
 export async function GET(req: NextRequest) {
   const token = req.cookies.get('sc_admin_token')?.value

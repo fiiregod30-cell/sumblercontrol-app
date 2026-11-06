@@ -12,7 +12,6 @@ export default function CheckoutPage() {
   const [pedidoId, setPedidoId] = useState('')
   const [qrCode, setQrCode] = useState('')
   const [copiaCola, setCopiaCola] = useState('')
-  const [valorFinal, setValorFinal] = useState(0)
   const [precoBase, setPrecoBase] = useState(0)
   const [loading, setLoading] = useState(false)
   const [erro, setErro] = useState('')
@@ -31,9 +30,8 @@ export default function CheckoutPage() {
         if (plano === 'semestral') preco = d.precoSemestral
         if (plano === 'anual') preco = d.precoAnual
         setPrecoBase(preco)
-        setValorFinal(preco)
       })
-      .catch(() => { setPrecoBase(31.99); setValorFinal(31.99) })
+      .catch(() => { setPrecoBase(31.99) })
   }, [])
 
   // Polling de status do pagamento
@@ -93,7 +91,6 @@ export default function CheckoutPage() {
       setPedidoId(data.pedidoId)
       setQrCode(data.qrCode)
       setCopiaCola(data.copiaCola)
-      setValorFinal(data.valorFinal)
       setTimer(30 * 60) // 30 minutos
     } catch { setErro('Erro de conexão') } finally { setLoading(false) }
   }

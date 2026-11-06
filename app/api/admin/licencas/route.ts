@@ -28,7 +28,7 @@ export async function GET(req: NextRequest) {
   // Para cada licença, busca contagem de HWIDs distintos nas últimas 24h (detecção de spoof/sharing)
   const licencaIds = (data || []).map(l => l.id)
 
-  let spoofMap: Record<string, number> = {}
+  const spoofMap: Record<string, number> = {}
   if (licencaIds.length > 0) {
     const { data: logsRecentes } = await supabaseAdmin
       .from('licenca_logs')

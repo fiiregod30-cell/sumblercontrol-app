@@ -3,9 +3,13 @@ import { supabaseAdmin } from './supabase'
 
 const SITE_URL = process.env.NEXT_PUBLIC_SITE_URL!
 
-const resend = new Resend(process.env.RESEND_API_KEY)
-
 const FROM = 'SumblerControl <noreply@sumblercontrol.com.br>'
+
+function getResend() {
+  const apiKey = process.env.RESEND_API_KEY
+  if (!apiKey) throw new Error('RESEND_API_KEY não está configurada.')
+  return new Resend(apiKey)
+}
 
 // Busca o link de download sempre do banco (admin pode atualizar)
 async function getDownloadLink(): Promise<string> {
@@ -20,7 +24,7 @@ async function getDownloadLink(): Promise<string> {
 // ── E-mail de confirmação de cadastro ───────────────────────
 export async function sendConfirmationEmail(email: string, name: string, token: string) {
   const confirmUrl = `${SITE_URL}/confirmar-email?token=${token}`
-  await resend.emails.send({
+  await getResend().emails.send({
     from: FROM,
     to: email,
     subject: 'Confirme seu e-mail — SumblerControl',
@@ -45,7 +49,7 @@ export async function sendConfirmationEmail(email: string, name: string, token: 
 // ── E-mail de entrega após pagamento confirmado ──────────────
 export async function sendDownloadEmail(email: string, name: string, pedidoId: string) {
   const DOWNLOAD_LINK = await getDownloadLink()
-  await resend.emails.send({
+  await getResend().emails.send({
     from: FROM,
     to: email,
     subject: '✅ Pagamento confirmado — Seu download está pronto!',
@@ -74,7 +78,7 @@ export async function sendDownloadEmail(email: string, name: string, pedidoId: s
 // ── E-mail de reenvio manual (admin) ─────────────────────────
 export async function sendDownloadEmailManual(email: string, name: string) {
   const DOWNLOAD_LINK = await getDownloadLink()
-  await resend.emails.send({
+  await getResend().emails.send({
     from: FROM,
     to: email,
     subject: '📦 SumblerControl — Link de download',
@@ -92,7 +96,7 @@ export async function sendDownloadEmailManual(email: string, name: string) {
 
 // ── E-mail com a key após ativação ───────────────────────────
 export async function sendLicensaEmail(email: string, name: string, key: string) {
-  await resend.emails.send({
+  await getResend().emails.send({
     from: FROM,
     to: email,
     subject: `🔑 Sua licença SumblerControl — ${key}`,
@@ -122,7 +126,7 @@ export async function sendLicensaEmail(email: string, name: string, key: string)
 
 // ── E-mail de reset de HWID pelo admin ───────────────────────
 export async function sendHwidResetEmail(email: string, name: string) {
-  await resend.emails.send({
+  await getResend().emails.send({
     from: FROM,
     to: email,
     subject: '🔄 HWID resetado — SumblerControl',

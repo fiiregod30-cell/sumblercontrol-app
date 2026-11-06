@@ -18,6 +18,7 @@ CREATE TABLE IF NOT EXISTS solicitacoes_reembolso (
   revisado_em TIMESTAMPTZ
 );
 
+REVOKE ALL ON TABLE solicitacoes_reembolso FROM PUBLIC, anon, authenticated;
 GRANT SELECT, INSERT, UPDATE, DELETE ON TABLE solicitacoes_reembolso TO service_role;
 
 CREATE INDEX IF NOT EXISTS idx_solicitacoes_reembolso_usuario

@@ -2,8 +2,8 @@
 --  SumblerControl — Schema do Banco de Dados
 --  Executar no Supabase SQL Editor
 -- ============================================================
--- Para habilitar solicitações e revisão manual de reembolso, execute também
--- database/refund-requests.sql após as tabelas de licenças e logs existirem.
+-- Em uma instalação nova, execute database/core-tables.sql em seguida e
+-- continue na ordem documentada em database/README.md.
 
 -- Tabela de usuários
 CREATE TABLE IF NOT EXISTS usuarios (
@@ -342,8 +342,13 @@ ALTER TABLE config_site ENABLE ROW LEVEL SECURITY;
 
 -- Policies: service_role tem acesso total (usado pelo backend)
 -- Frontend usa anon key mas com RLS restritivo
-CREATE POLICY "service_role_all_usuarios" ON usuarios FOR ALL TO service_role USING (true);
-CREATE POLICY "service_role_all_pedidos" ON pedidos FOR ALL TO service_role USING (true);
-CREATE POLICY "service_role_all_cupons" ON cupons FOR ALL TO service_role USING (true);
-CREATE POLICY "service_role_all_admins" ON admins FOR ALL TO service_role USING (true);
-CREATE POLICY "service_role_all_config" ON config_site FOR ALL TO service_role USING (true);
+DROP POLICY IF EXISTS "service_role_all_usuarios" ON usuarios;
+CREATE POLICY "service_role_all_usuarios" ON usuarios FOR ALL TO service_role USING (true) WITH CHECK (true);
+DROP POLICY IF EXISTS "service_role_all_pedidos" ON pedidos;
+CREATE POLICY "service_role_all_pedidos" ON pedidos FOR ALL TO service_role USING (true) WITH CHECK (true);
+DROP POLICY IF EXISTS "service_role_all_cupons" ON cupons;
+CREATE POLICY "service_role_all_cupons" ON cupons FOR ALL TO service_role USING (true) WITH CHECK (true);
+DROP POLICY IF EXISTS "service_role_all_admins" ON admins;
+CREATE POLICY "service_role_all_admins" ON admins FOR ALL TO service_role USING (true) WITH CHECK (true);
+DROP POLICY IF EXISTS "service_role_all_config" ON config_site;
+CREATE POLICY "service_role_all_config" ON config_site FOR ALL TO service_role USING (true) WITH CHECK (true);

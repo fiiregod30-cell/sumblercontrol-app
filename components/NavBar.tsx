@@ -20,6 +20,15 @@ export default function NavBar() {
   const dropRef = useRef<HTMLDivElement>(null)
   const notifIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null)
 
+  async function pollarNotificacoes() {
+    try {
+      const r = await fetch('/api/notificacoes', { credentials: 'include' })
+      if (!r.ok) return
+      const d = await r.json()
+      setTotalNaoLidas(d.total_nao_lidas || 0)
+    } catch {}
+  }
+
   useEffect(() => {
     fetch('/api/auth/me', { credentials: 'include' })
       .then(r => r.json())
@@ -36,15 +45,6 @@ export default function NavBar() {
       .catch(() => {})
     return () => { if (notifIntervalRef.current) clearInterval(notifIntervalRef.current) }
   }, [])
-
-  async function pollarNotificacoes() {
-    try {
-      const r = await fetch('/api/notificacoes', { credentials: 'include' })
-      if (!r.ok) return
-      const d = await r.json()
-      setTotalNaoLidas(d.total_nao_lidas || 0)
-    } catch {}
-  }
 
   // Fecha dropdown ao clicar fora
   useEffect(() => {

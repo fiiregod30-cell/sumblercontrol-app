@@ -1,5 +1,6 @@
 'use client'
 import { useState, useEffect, useRef } from 'react'
+import Link from 'next/link'
 import { usePathname, useRouter } from 'next/navigation'
 
 // ─── Tipos ────────────────────────────────────────────────────────────────────
@@ -363,7 +364,7 @@ export default function SupportWidget() {
                       Você tem um pagamento pendente. Finalize para participar do chat.
                     </p>
                     <div style={{ display: 'flex', gap: '8px', width: '100%' }}>
-                      <a href="/minha-conta" style={{ flex: 1, padding: '8px', background: '#FBBF24', border: 'none', borderRadius: '8px', color: '#000', fontSize: '12px', fontWeight: '700', textDecoration: 'none', textAlign: 'center' }}>Ver pedido</a>
+                      <Link href="/minha-conta" style={{ flex: 1, padding: '8px', background: '#FBBF24', border: 'none', borderRadius: '8px', color: '#000', fontSize: '12px', fontWeight: '700', textDecoration: 'none', textAlign: 'center' }}>Ver pedido</Link>
                       <button onClick={() => setAba('ticket')} style={{ flex: 1, padding: '8px', background: 'transparent', border: '1px solid #243044', borderRadius: '8px', color: '#647489', fontSize: '12px', fontWeight: '600', cursor: 'pointer' }}>🎫 Ticket</button>
                     </div>
                   </div>
@@ -375,7 +376,7 @@ export default function SupportWidget() {
                       Sua licença expirou. Renove para voltar ao chat.
                     </p>
                     <div style={{ display: 'flex', gap: '8px', width: '100%' }}>
-                      <a href="/#preco" style={{ flex: 1, padding: '8px', background: '#3B82F6', border: 'none', borderRadius: '8px', color: '#fff', fontSize: '12px', fontWeight: '600', textDecoration: 'none', textAlign: 'center' }}>Renovar agora</a>
+                      <Link href="/#preco" style={{ flex: 1, padding: '8px', background: '#3B82F6', border: 'none', borderRadius: '8px', color: '#fff', fontSize: '12px', fontWeight: '600', textDecoration: 'none', textAlign: 'center' }}>Renovar agora</Link>
                       <button onClick={() => setAba('ticket')} style={{ flex: 1, padding: '8px', background: 'transparent', border: '1px solid #243044', borderRadius: '8px', color: '#647489', fontSize: '12px', fontWeight: '600', cursor: 'pointer' }}>🎫 Ticket</button>
                     </div>
                   </div>
@@ -495,11 +496,11 @@ export default function SupportWidget() {
                   </button>
 
                   {/* Link para ver tickets anteriores */}
-                  <a href="/notificacoes" style={{ fontSize: '12px', color: '#647489', textAlign: 'center', textDecoration: 'none', marginTop: '4px' }}
+                  <Link href="/notificacoes" style={{ fontSize: '12px', color: '#647489', textAlign: 'center', textDecoration: 'none', marginTop: '4px' }}
                     onMouseEnter={e => (e.currentTarget.style.color = '#3B82F6')}
                     onMouseLeave={e => (e.currentTarget.style.color = '#647489')}>
                     🔔 Ver meus tickets e notificações →
-                  </a>
+                  </Link>
                   </>
                 )}
                 </>
